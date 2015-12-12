@@ -29,7 +29,7 @@ class NTM(config):
 
     def build_model(self):
         dummy = tf.placeholder(tf.float32, [1])
-        output_init = tf.nn.tanh(Linear(dummy, [1, self.output_dim], 'output_w'))
+        output_init = tf.nn.tanh(linear(dummy, [1, self.output_dim], 'output_w'))
 
         # memorny
-        M_init_lin = Linear(dummy, [1, self.mem_rows * self.mem_cols], 'M_init_w')
+        m_init_lin = linear(dummy, [1, self.mem_rows * self.mem_cols], 'm_init_w')
