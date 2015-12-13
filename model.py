@@ -33,3 +33,4 @@ class NTM(config):
 
         # memorny
         m_init_lin = linear(dummy, [1, self.mem_rows * self.mem_cols], 'm_init_w')
+

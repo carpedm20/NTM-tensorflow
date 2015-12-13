@@ -20,6 +20,12 @@ Usage
 in progress
 
 
+Reference
+---------
+
+- ![Neural Turing Machine](http://cpmarkchang.logdown.com/posts/279710-neural-network-neural-turing-machine)
+
+
 
 Author
 ------

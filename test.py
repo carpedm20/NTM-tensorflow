@@ -1,6 +1,12 @@
 import numpy as np
 import tensorflow as tf
 
+# Fix this in TensorFlow v0.6.
+try:
+    from tensorflow.models.rnn import linear
+except AttributeError:
+    from tensorflow.python.ops.rnn_cell import linear
+
 init_std = 1
 input_dim = 10
 output_dim = 10
@@ -37,15 +43,10 @@ def Linear(input, shape, stddev=0.5, name=None):
 dummy = tf.placeholder(tf.float32, [None, 1])
 
 # [batch_size x output_dim]
-output_init = tf.tanh(Linear(dummy, [1, output_dim], name='output_lin'))
+output_init = tf.tanh(linear.linear(dummy, output_dim, bias=True, bias_start=1))
 
-
-##########
 # memory
-##########
-
-# [mem_rows x mem_cols]
-m_init = tf.reshape(tf.tanh(Linear(dummy, [1, mem_rows * mem_cols])), \
+m_init = tf.reshape(tf.tanh(linear.linear(dummy, mem_rows * mem_cols, bias=True)),
                     [mem_rows, mem_cols])
 
 # read weights
@@ -80,21 +81,86 @@ for idx in xrange(cont_layer_size):
 # Combine memories
 #####################
 
-ww = nn.placeholder(tf.float32, [])
-wr = nn.placeholder(tf.float32, [])
-r = nn.placeholder(tf.float32, [])
-m = nn.placeholder(tf.float32, [])
-c = nn.placeholder(tf.float32, [])
+ww = tf.placeholder(tf.float32, [])
+wr = tf.placeholder(tf.float32, [])
+r = tf.placeholder(tf.float32, [])
+m = tf.placeholder(tf.float32, [])
+c = tf.placeholder(tf.float32, [])
 
 
 ######################
-# Connect NTM cells
+# Cotfect NTM cells
 ######################
 
-ww_p = nn.placeholder(tf.float32, [])
-wr_p = nn.placeholder(tf.float32, [])
-r_p = nn.placeholder(tf.float32, [])
-m_p = nn.placeholder(tf.float32, [])
-c_p = nn.placeholder(tf.float32, [])
+ww_p = tf.placeholder(tf.float32, [])
+wr_p = tf.placeholder(tf.float32, [])
+r_p = tf.placeholder(tf.float32, [])
+m_p = tf.placeholder(tf.float32, [])
+c_p = tf.placeholder(tf.float32, [])
 
+#############
+# new cell
+#############
 
+input = tf.placeholder(tf.float32, [])
+
+# previous memory state and read/write weights
+memory_prev = tf.placeholder(tf.float32, [])
+read_weight_prev = tf.placeholder(tf.float32, [])
+write_weight_prev = tf.placeholder(tf.float32, [])
+
+# vecter read from emory
+read_prev = tf.placeohlder(tf.float32, [])
+
+# ?????
+# LSTM controller output
+mtable_prev = tf.placeohlder(tf.float32, [])
+ctable_prev = tf.placeohlder(tf.float32, [])
+
+#mtable, ctable = new_controller_module()
+
+#########################
+# new_controller_module
+#########################
+
+input = input
+
+read_prev = read_prev
+mtable_prev = mtable_prev
+ctable_prev = ctable_prev
+
+mtable = []
+ctable = []
+
+for layer_idx in xrange(controller_layer_size):
+    if controller_layer_size == 1:
+        m_p = mtable_prev
+        c_p = ctable_prev
+    else:
+        m_p = tf.gather(mtable_prev, layer_idx)
+        c_p = tf.gather(ctable_prev, layer_idx)
+
+    if layer_idx == 1:
+        def new_gate():
+            in_modules = [
+                linear.linear(input, controller_dim, bias=True),
+                linear.linear(m_p, controller_dim, bias=True),
+            ]
+            if read_heads == 1:
+                in_modules.append(linear.linear(r_p, controller_dim, bias=True))
+            else:
+                for head_idx in xrange(read_heads):
+                    vec = tf.gather(r_p, head_idx)
+                    in_modules.append(linear.linear(r_p, controller_dim, bias=True))
+            return tf.reduced_sum(in_modules, 0) 
+    else:
+        def new_gate():
+            return tf.reduced_sum([
+                linear.linear(input, controller_dim, bias=True),
+                linear.linear(m_p, controller_dim, bias=True),
+            ], 0)
+
+    i = tf.sigmoid(new_gate())
+    f = tf.sigmoid(new_gate())
+    o = tf.sigmoid(new_gate())
+    update = tf.tanh(new_gate())
