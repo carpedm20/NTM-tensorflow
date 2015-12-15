@@ -74,11 +74,11 @@ class NTM(object):
         s = tf.nn.softmax(Linear(last_output, 2 * self.shift_range + 1))
         beta  = tf.nn.softplus(Linear(last_output, 1))
         g = tf.sigmoid(Linear(last_output, 1))
-        gamma = tf.add(tf.nn.softplus(Linear(last_output, 1)), tf.constant(1))
+        gamma = tf.add(tf.nn.softplus(Linear(last_output, 1)), tf.constant(1.0))
 
         # similarity layer
         M_dim_norm = tf.sqrt(tf.reduce_sum(tf.mul(M_prev, M_prev),1))
-        k_norm = tf.sqrt(tf.matmul(k,k))
+        k_norm = tf.sqrt(tf.mul(k,k))
         dot = tf.mul(M_prev, k)
         sim = tf.div(dot, (M_dim_norm * k_norm + 1e-3))
 
