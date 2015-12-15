@@ -1,22 +1,18 @@
 import numpy as np
 import tensorflow as tf
 
-# Fix this in TensorFlow v0.6.
-try:
-    from tensorflow.models.rnn import linear
-except AttributeError:
-    from tensorflow.python.ops.rnn_cell import linear
+from layers import *
 
 init_std = 1
 input_dim = 10
 output_dim = 10
 mem_rows = 128
 mem_cols = 20
-count_dim = 100
+controller_dim = 100
 
 read_head_size = 1 # reader header size
 write_head_size = 1 # writer header size
-cont_layer_size = 1 # controller layer size
+controller_layer_size = 1 # controller layer size
 
 start_symbol = np.zeros(input_dim)
 start_symbol[1] = 1
@@ -29,24 +25,15 @@ def generate_sequence(length, bits):
         seq[idx, 2:bits+2] = np.random.rand(bits).round()
     return seq
 
-def Linear(input, shape, stddev=0.5, name=None):
-    w_name = "%s_w" % name if name else None
-    b_name = "%s_b" % name if name else None
-
-    w = tf.Variable(tf.random_normal(shape, stddev=stddev, name=w_name))
-    b = tf.Variable(tf.constant(0.0, shape=[shape[1]], dtype=tf.float32, name=b_name),
-                                trainable=True)
-    return tf.nn.bias_add(tf.matmul(input, w), b)
-
 # always zero?
 # [batch_size x 1]
 dummy = tf.placeholder(tf.float32, [None, 1])
 
 # [batch_size x output_dim]
-output_init = tf.tanh(linear.linear(dummy, output_dim, bias=True, bias_start=1))
+output_init = tf.tanh(Linear(dummy, output_dim, bias=True, bias_init=1))
 
 # memory
-m_init = tf.reshape(tf.tanh(linear.linear(dummy, mem_rows * mem_cols, bias=True)),
+m_init = tf.reshape(tf.tanh(Linear(dummy, mem_rows * mem_cols, bias=True)),
                     [mem_rows, mem_cols])
 
 # read weights
@@ -57,9 +44,9 @@ for idx in xrange(read_head_size):
     write_init_lin = tf.nn.bias_add(tf.matmul(dummy, write_w), write_b)
 
     write_init.append(tf.nn.softmax(write_init_lin))
-    #write_init.append(tf.nn.softmax(Linear(dummy, [1, mem_rows], name='write_lin')))
+    #write_init.append(tf.nn.softmax(Linear(dummy, mem_rows, name='write_lin')))
 
-    read_init.append(tf.nn.softmax(Linear(dummy, [1, mem_cols], name='read_lin')))
+    read_init.append(tf.nn.softmax(Linear(dummy, mem_cols, name='read_lin')))
 
 # write weights
 ww_init = []
@@ -72,9 +59,9 @@ for idx in xrange(write_head_size):
 
 # controller state
 m_init, c_init = [], []
-for idx in xrange(cont_layer_size):
-    m_init.append(tf.tanh(Linear(dummy, [1, count_dim])))
-    c_init.append(tf.tanh(Linear(dummy, [1, count_dim])))
+for idx in xrange(controller_layer_size):
+    m_init.append(tf.tanh(Linear(dummy, controller_dim)))
+    c_init.append(tf.tanh(Linear(dummy, controller_dim)))
 
 
 #####################
@@ -102,20 +89,20 @@ c_p = tf.placeholder(tf.float32, [])
 # new cell
 #############
 
-input = tf.placeholder(tf.float32, [])
+input = tf.placeholder(tf.float32, [None, input_dim])
 
 # previous memory state and read/write weights
-memory_prev = tf.placeholder(tf.float32, [])
-read_weight_prev = tf.placeholder(tf.float32, [])
-write_weight_prev = tf.placeholder(tf.float32, [])
+memory_prev = tf.placeholder(tf.float32, [None, mem_cols * mem_rows])
+read_weight_prev = tf.placeholder(tf.float32, [None, mem_cols])
+write_weight_prev = tf.placeholder(tf.float32, [None, mem_cols])
 
 # vecter read from emory
-read_prev = tf.placeohlder(tf.float32, [])
+read_prev = tf.placeholder(tf.float32, [])
 
 # ?????
 # LSTM controller output
-mtable_prev = tf.placeohlder(tf.float32, [])
-ctable_prev = tf.placeohlder(tf.float32, [])
+mtable_prev = tf.placeholder(tf.float32, [None, mem_cols * mem_rows])
+ctable_prev = tf.placeholder(tf.float32, [None, mem_cols * mem_rows])
 
 #mtable, ctable = new_controller_module()
 
@@ -143,24 +130,33 @@ for layer_idx in xrange(controller_layer_size):
     if layer_idx == 1:
         def new_gate():
             in_modules = [
-                linear.linear(input, controller_dim, bias=True),
-                linear.linear(m_p, controller_dim, bias=True),
+                Linear(input, controller_dim, bias=True),
+                Linear(m_p, controller_dim, bias=True),
             ]
             if read_heads == 1:
-                in_modules.append(linear.linear(r_p, controller_dim, bias=True))
+                in_modules.append(Linear(r_p, controller_dim, bias=True))
             else:
                 for head_idx in xrange(read_heads):
                     vec = tf.gather(r_p, head_idx)
-                    in_modules.append(linear.linear(r_p, controller_dim, bias=True))
+                    in_modules.append(Linear(r_p, controller_dim, bias=True))
             return tf.reduced_sum(in_modules, 0) 
     else:
         def new_gate():
-            return tf.reduced_sum([
-                linear.linear(input, controller_dim, bias=True),
-                linear.linear(m_p, controller_dim, bias=True),
-            ], 0)
+            return tf.add(
+                Linear(input, controller_dim, bias=True),
+                Linear(m_p, controller_dim, bias=True),
+            )
 
     i = tf.sigmoid(new_gate())
     f = tf.sigmoid(new_gate())
     o = tf.sigmoid(new_gate())
     update = tf.tanh(new_gate())
+
+    ctable[layer_idx] = tf.add(
+        tf.mul(f, c_p),
+        tf.mul(i, update)
+    )
+    mtable[layer_idx] = tf.mul(o, tf.tanh(ctable[layer_idx]))
+
+mtable = tf.identity(ctable)
+ctable = tf.identity(ctable)
