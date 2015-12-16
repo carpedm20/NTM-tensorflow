@@ -32,20 +32,28 @@ class NTM(object):
         self.depth = 0
         self.cells = {}
         self.master_cell = self.build_cell() # [input_sets, output_sets]
-        self.init_module = self.new_init_module()
+        self.init_module = self.build_init_module()
 
     def build_init_module(self):
-        dummy = tf.placeholder(tf.float32, [None, 1])
+        # always zero
+        dummy = tf.placeholder(tf.float32, [1])
         output_init = tf.tanh(Linear(dummy, output_dim, bias=True, bias_init=1))
 
         # memory
-        m_init = tf.reshape(tf.tanh(Linear(dummy, mem_rows * mem_cols, bias=True)),
-                            [mem_rows, mem_cols])
+        M_init_linear = tf.tanh(Linear(dummy, mem_rows * mem_cols, bias=True))
+        M_init = tf.reshape(M_init_linear, [mem_rows, mem_cols])
 
         # read weights
-        write_init, read_init = [], []
+        read_w_init = tf.Variable(tf.zeros([self.read_head_size, self.mem_size]))
+        read_init = tf.Variable(tf.zeros([self.read_head_size, self.mem_size, self.mem_dim]))
+
         for idx in xrange(read_head_size):
-            write_w = tf.Variable(tf.random_normal([1, mem_rows]))
+            read_w = tf.scatter_update(read_w, [idx], tf.transpose(read_w_idx))
+
+            read_idx = tf.tanh(Linear(dummy, self.mem_dim))
+            read = tf.scatter_update(read_init, [idx], tf.reshape(read_idx, [1, self.mem_size, self.mem_dim]))
+
+            read_w = tf.Variable(tf.random_normal([1, self.mem_dim]))
             write_b = tf.Variable(tf.cast(tf.range(mem_rows-2, 0, -1), dtype=tf.float32))
             write_init_lin = tf.nn.bias_add(tf.matmul(dummy, write_w), write_b)
 

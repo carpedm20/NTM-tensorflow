@@ -20,8 +20,8 @@ def Linear(inputs, output_size, stddev=0.5, bias=True, bias_init=0.0, name=None)
     w_name = "%s_w" % name if name else None
     b_name = "%s_b" % name if name else None
 
-    w = tf.Variable(tf.random_normal([total_input_size, output_size], \
-                                      stddev=stddev, name=w_name))
+    w = tf.identity(tf.random_normal([total_input_size, output_size], stddev=stddev, \
+                                      name=w_name))
     if len(inputs) == 1:
       mul = tf.matmul(inputs[0], w)
     else:
@@ -54,20 +54,23 @@ def CircularConvolution(vector, kernel):
 
     def loop(idx):
         if idx < 0: return size + idx
+        if idx >= size : return idx - size
         else: return idx
 
     for i in xrange(size):
-        indices = [loop(i+j) for j in xrange(-kernel_shift, kernel_shift+1)]
+        indices = [loop(i+j) for j in xrange(kernel_shift, -kernel_shift-1, -1)]
         v = tf.gather(vector, indices)
-        output = tf.scatter_add(output, indices, v * kernel)
+        output = tf.scatter_add(output, [i], tf.reduce_sum(v * kernel, 0, keep_dims=True))
 
-    #for i in xrange(size):
-    #    for j in xrange(kernel_size):
-    #        idx = i + kernel_shift - j + 1
-    #        if idx < 0: idx = idx + size
-    #        if idx >= size: idx = idx - size
-    #        w = tf.gather(vector, int(idx)) * tf.gather(kernel, j)
-    #        output = tf.scatter_add(output, [i], tf.reshape(w, [1, -1]))
+    # # code with double loop
+    # for i in xrange(size):
+    #     for j in xrange(kernel_size):
+    #         idx = i + kernel_shift - j + 1
+    #         if idx < 0: idx = idx + size
+    #         if idx >= size: idx = idx - size
+    #         w = tf.gather(vector, int(idx)) * tf.gather(kernel, j)
+    #         output = tf.scatter_add(output, [i], tf.reshape(w, [1, -1]))
+
     return output
 
 def OuterProd(*inputs):
