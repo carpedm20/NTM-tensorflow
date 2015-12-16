@@ -3,7 +3,7 @@ import tensorflow as tf
 
 from utils import *
 
-def Linear(inputs, output_size, stddev=0.5, bias=True, bias_init=0.0, name=None):
+def Linear(inputs, output_size, stddev=0.5, bias=True, bias_init=0.0, name=None, mem_size=None):
     total_input_size = 0
     if type(inputs) != list:
         inputs = [inputs]
@@ -28,7 +28,10 @@ def Linear(inputs, output_size, stddev=0.5, bias=True, bias_init=0.0, name=None)
       mul = tf.matmul(tf.concat(1, inputs), w)
 
     if bias:
-        b = tf.Variable(tf.constant(bias_init, shape=[output_size], dtype=tf.float32))
+        if mem_size:
+            b = tf.Variable(tf.cast(tf.range(mem_size-2, 0, -1), dtype=tf.float32))
+        else:
+            b = tf.Variable(tf.constant(bias_init, shape=[output_size], dtype=tf.float32))
         return tf.nn.bias_add(mul, b)
     else:
         return mul

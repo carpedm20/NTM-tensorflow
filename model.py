@@ -36,52 +36,41 @@ class NTM(object):
 
     def build_init_module(self):
         # always zero
-        dummy = tf.placeholder(tf.float32, [1])
-        output_init = tf.tanh(Linear(dummy, output_dim, bias=True, bias_init=1))
+        dummy = tf.placeholder(tf.float32, [1, 1])
+        output_init = tf.tanh(Linear(dummy, self.output_dim, bias=True, bias_init=1))
 
         # memory
-        M_init_linear = tf.tanh(Linear(dummy, mem_rows * mem_cols, bias=True))
-        M_init = tf.reshape(M_init_linear, [mem_rows, mem_cols])
+        M_init_linear = tf.tanh(Linear(dummy, self.mem_size * self.mem_dim, bias=True))
+        M_init = tf.reshape(M_init_linear, [self.mem_size, self.mem_dim])
 
         # read weights
         read_w_init = tf.Variable(tf.zeros([self.read_head_size, self.mem_size]))
-        read_init = tf.Variable(tf.zeros([self.read_head_size, self.mem_size, self.mem_dim]))
+        read_init = tf.Variable(tf.zeros([self.read_head_size, 1, self.mem_dim]))
 
-        for idx in xrange(read_head_size):
-            read_w = tf.scatter_update(read_w, [idx], tf.transpose(read_w_idx))
+        for idx in xrange(self.read_head_size):
+            # initialize bias distribution with `tf.range(mem_size-2, 0, -1)`
+            read_w_linear_idx = Linear(dummy, self.mem_size, mem_size=self.mem_size) 
+            read_w_init = tf.scatter_update(read_w_init, [idx], tf.nn.softmax(read_w_linear_idx))
 
-            read_idx = tf.tanh(Linear(dummy, self.mem_dim))
-            read = tf.scatter_update(read_init, [idx], tf.reshape(read_idx, [1, self.mem_size, self.mem_dim]))
-
-            read_w = tf.Variable(tf.random_normal([1, self.mem_dim]))
-            write_b = tf.Variable(tf.cast(tf.range(mem_rows-2, 0, -1), dtype=tf.float32))
-            write_init_lin = tf.nn.bias_add(tf.matmul(dummy, write_w), write_b)
-
-            write_init.append(tf.nn.softmax(write_init_lin))
-            #write_init.append(tf.nn.softmax(Linear(dummy, mem_rows, name='write_lin')))
-
-            read_init.append(tf.nn.softmax(Linear(dummy, mem_cols, name='read_lin')))
+            read_init_idx = tf.tanh(Linear(dummy, self.mem_dim))
+            read_init = tf.scatter_update(read_init, [idx], tf.reshape(read_init_idx, [1, 1, self.mem_dim]))
 
         # write weights
-        ww_init = []
-        for idx in xrange(write_head_size):
-            ww_w = tf.Variable(tf.random_normal([1, mem_rows]))
-            ww_b = tf.Variable(tf.cast(tf.range(mem_rows-2, 0, -1), dtype=tf.float32))
-            ww_init_lin = tf.nn.bias_add(tf.matmul(dummy, ww_w), ww_b)
-
-            ww_init.append(tf.nn.softmax(ww_init_lin))
+        write_w_init = tf.Variable(tf.zeros([self.write_head_size, self.mem_size]))
+        for idx in xrange(self.write_head_size):
+            write_w_linear_idx = Linear(dummy, self.mem_size)
+            write_w_init = tf.scatter_update(write_w_init, [idx], tf.nn.softmax(write_w_linear_idx))
 
         # controller state
-        m_init, c_init = [], []
-        for idx in xrange(controller_layer_size):
-            m_init.append(tf.tanh(Linear(dummy, controller_dim)))
-            c_init.append(tf.tanh(Linear(dummy, controller_dim)))
+        output_init, hidden_init = [], []
+        for idx in xrange(self.controller_layer_size):
+            output_init.append(tf.tanh(Linear(dummy, self.controller_dim)))
+            hidden_init.append(tf.tanh(Linear(dummy, self.controller_dim)))
 
-        ww = tf.placeholder(tf.float32, [])
-        wr = tf.placeholder(tf.float32, [])
-        r = tf.placeholder(tf.float32, [])
-        m = tf.placeholder(tf.float32, [])
-        c = tf.placeholder(tf.float32, [])
+        self.init_inputs = [dummy]
+        self.init_outputs = [output_init, M_init, read_w_init, write_w_init, read_init, output_init, hidden_init]
+
+        return [self.inputs, self.outputs]
 
     # Build a NTM cell which shares weights with "master" cell.
     def build_cell(self):
