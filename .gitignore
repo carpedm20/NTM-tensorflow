@@ -5,6 +5,9 @@ log
 checkpoint
 *.model-*
 
+# test
+app.py
+
 # trash
 .dropbox
 test*
