@@ -8,7 +8,9 @@ from utils import *
 from layers import *
 
 class NTM(object):
-    def __init__(self, config=None):
+    def __init__(self, config=None, sess=None):
+        self.sess = sess
+
         self.input_dim = 128
         self.output_dim = 128
         self.mem_size = 128
@@ -30,11 +32,15 @@ class NTM(object):
         #self.read_heads_size = config.read_heads_size  or 1
 
         self.depth = 0
-        self.cells = {}
-        self.master_cell = self.build_cell() # [input_sets, output_sets]
-        self.init_module = self.build_init_module()
+        self.input_cells = []
+        self.output_cells = []
+        self.prev_outputs = []
 
-    def build_init_module(self):
+        self.master_input_cell, self.master_output_cell = self.build_cell()
+        tf.initialize_all_variables().run()
+        self.init_input_cell, self.init_output_cell = self.build_init_cell()
+
+    def build_init_cell(self):
         # always zero
         dummy = tf.placeholder(tf.float32, [1, 1])
         output_init = tf.tanh(Linear(dummy, self.output_dim, bias=True, bias_init=1))
@@ -67,10 +73,19 @@ class NTM(object):
             output_init.append(tf.tanh(Linear(dummy, self.controller_dim)))
             hidden_init.append(tf.tanh(Linear(dummy, self.controller_dim)))
 
-        self.init_inputs = [dummy]
-        self.init_outputs = [output_init, M_init, read_w_init, write_w_init, read_init, output_init, hidden_init]
-
-        return [self.inputs, self.outputs]
+        inputs = {
+            'input': dummy,
+        }
+        outputs = {
+            'output': output_init,
+            'M': M_init,
+            'read_w': read_w_init,
+            'write_w': write_w_init,
+            'read': read_init,
+            'output': output_init,
+            'hidden': hidden_init
+        }
+        return inputs, outputs
 
     # Build a NTM cell which shares weights with "master" cell.
     def build_cell(self):
@@ -100,10 +115,25 @@ class NTM(object):
         M, read_w, write_w, read = self.build_memory(M_prev, read_w_prev, write_w_prev, last_output)
         output = self.build_output(last_output)
 
-        self.inputs = [input, M_prev, read_w_prev, write_w_prev, read_prev, output_prev, hidden_prev]
-        self.outputs = [output, M, read_w, write_w, read, output, hidden]
-
-        return [self.inputs, self.outputs]
+        inputs = {
+            'input': input,
+            'M_prev': M_prev,
+            'read_w_prev': read_w_prev,
+            'write_w_prev': write_w_prev,
+            'read_prev': read_prev,
+            'output_prev': output_prev,
+            'hidden_prev': hidden_prev
+        }
+        outputs = {
+            'output': output,
+            'M': M,
+            'read_w': read_w,
+            'write_w': write_w,
+            'read': read,
+            'output': output,
+            'hidden': hidden
+        }
+        return inputs, outputs
 
     def build_read_head(self, M_prev, read_w_prev, last_output):
         return self.build_head(M_prev, read_w_prev, last_output, True)
@@ -254,23 +284,54 @@ class NTM(object):
 
     def forward(self, input):
         self.depth += 1
+        
+        print(" [*] Initialization start...")
+        self.sess.run(tf.initialize_all_variables())
+        print(" [*] Initialization end")
+
+        if self.depth == 1:
+            prev_outputs = self.sess.run([
+                    self.init_output_cell['output'][-1], self.init_output_cell['hidden'][-1],
+                    self.init_output_cell['M'], self.init_output_cell['read_w'],
+                    self.init_output_cell['write_w'], self.init_output_cell['read'],
+                ], feed_dict={
+                    self.init_input_cell['input']: [[0.0]]
+                }
+            )
+            import ipdb; ipdb.set_trace() 
+        else:
+            prev_outputs = self.prev_outputs[self.depth - 1]
 
         try:
-            cell = self.cells[self.depth]
+            cur_input_cell = self.input_cells[self.depth]
+            cur_output_cell = self.output_cells[self.depth]
         except:
-            cell = self.new_cell()
-            self.cells.append(cell)
-        
-        if self.depth == 1:
-            prev_outputs = self.init_module(tf.constant(0.0))
-        else:
-            prev_outputs = self.cells[self.depth - 1]#.output
+            cur_input_cell, cur_output_cell = self.build_cell()
+            self.input_cells.append(cur_input_cell)
+            self.output_cells.append(cur_output_cell)
 
-        inputs = [input]
-        for idx in xrange(1, len(prev_outputs)):
-            inputs.append(prev_outputs[idx])
-
-        outputs = cell.forward(inputs)
+        outputs = self.sess.run([
+                cur_output_cell['output'][-1], cur_output_cell['M'], cur_output_cell['hidden'],
+                cur_output_cell['read_w'], cur_output_cell['write_w'], cur_output_cell['read'],
+            ], feed_dict = {
+                cur_input_cell['input']: input,
+                cur_input_cell['M_prev']: prev_outputs['M'],
+                cur_input_cell['read_w_prev']: prev_outputs['read_w'],
+                cur_input_cell['write_w_prev']: prev_outputs['write_w'],
+                cur_input_cell['read_prev']: prev_outputs['read'],
+                cur_input_cell['output_prev']: prev_outputs['output'],
+                cur_input_cell['hidden_prev']: prev_outputs['hidden']
+            }
+        )
+        import ipdb; ipdb.set_trace() 
         self.output = outputs[0]
+        self.prev_outputs = outputs
 
         return self.output
+
+    def get_memory(self, depth=None):
+        if self.depth == 0:
+            inputs, outputs = self.init_cell()
+            return outputs['M_init']
+        #depth = depth if depth or self.depth
+        return self.cells[depth]
