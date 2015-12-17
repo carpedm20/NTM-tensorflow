@@ -29,7 +29,8 @@ def Linear(inputs, output_size, stddev=0.5, bias=True, bias_init=0.0, name=None,
 
     if bias:
         if mem_size:
-            b = tf.Variable(tf.cast(tf.range(mem_size-2, 0, -1), dtype=tf.float32))
+            range_ = tf.reverse(tf.range(mem_size-2), [True])
+            b = tf.Variable(tf.cast(range_, dtype=tf.float32))
         else:
             b = tf.Variable(tf.constant(bias_init, shape=[output_size], dtype=tf.float32))
         return tf.nn.bias_add(mul, b)

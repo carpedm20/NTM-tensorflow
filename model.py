@@ -40,6 +40,10 @@ class NTM(object):
         tf.initialize_all_variables().run()
         self.init_input_cell, self.init_output_cell = self.build_init_cell()
 
+        print(" [*] Initialization start...")
+        self.sess.run(tf.initialize_all_variables())
+        print(" [*] Initialization end")
+
     def build_init_cell(self):
         # always zero
         dummy = tf.placeholder(tf.float32, [1, 1])
@@ -82,7 +86,6 @@ class NTM(object):
             'read_w': read_w_init,
             'write_w': write_w_init,
             'read': read_init,
-            'output': output_init,
             'hidden': hidden_init
         }
         return inputs, outputs
@@ -113,7 +116,7 @@ class NTM(object):
 
         # Build a memory
         M, read_w, write_w, read = self.build_memory(M_prev, read_w_prev, write_w_prev, last_output)
-        output = self.build_output(last_output)
+        new_output = self.build_output(last_output)
 
         inputs = {
             'input': input,
@@ -125,13 +128,13 @@ class NTM(object):
             'hidden_prev': hidden_prev
         }
         outputs = {
-            'output': output,
+            'new_output': new_output,
             'M': M,
             'read_w': read_w,
             'write_w': write_w,
             'read': read,
             'output': output,
-            'hidden': hidden
+            'hidden': hidden,
         }
         return inputs, outputs
 
@@ -285,10 +288,6 @@ class NTM(object):
     def forward(self, input):
         self.depth += 1
         
-        print(" [*] Initialization start...")
-        self.sess.run(tf.initialize_all_variables())
-        print(" [*] Initialization end")
-
         if self.depth == 1:
             prev_outputs = self.sess.run([
                     self.init_output_cell['output'][-1], self.init_output_cell['hidden'][-1],
@@ -298,7 +297,6 @@ class NTM(object):
                     self.init_input_cell['input']: [[0.0]]
                 }
             )
-            import ipdb; ipdb.set_trace() 
         else:
             prev_outputs = self.prev_outputs[self.depth - 1]
 
@@ -311,7 +309,8 @@ class NTM(object):
             self.output_cells.append(cur_output_cell)
 
         outputs = self.sess.run([
-                cur_output_cell['output'][-1], cur_output_cell['M'], cur_output_cell['hidden'],
+                cur_output_cell['new_output'],
+                cur_output_cell['output'][-1], cur_output_cell['M'], cur_output_cell['hidden'][-1],
                 cur_output_cell['read_w'], cur_output_cell['write_w'], cur_output_cell['read'],
             ], feed_dict = {
                 cur_input_cell['input']: input,
@@ -323,7 +322,6 @@ class NTM(object):
                 cur_input_cell['hidden_prev']: prev_outputs['hidden']
             }
         )
-        import ipdb; ipdb.set_trace() 
         self.output = outputs[0]
         self.prev_outputs = outputs
 
