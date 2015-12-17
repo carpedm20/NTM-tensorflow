@@ -47,7 +47,6 @@ class NTM(object):
     def build_init_cell(self):
         # always zero
         dummy = tf.placeholder(tf.float32, [1, 1])
-        output_init = tf.tanh(Linear(dummy, self.output_dim, bias=True, bias_init=1))
 
         # memory
         M_init_linear = tf.tanh(Linear(dummy, self.mem_size * self.mem_dim, bias=True))
@@ -59,7 +58,7 @@ class NTM(object):
 
         for idx in xrange(self.read_head_size):
             # initialize bias distribution with `tf.range(mem_size-2, 0, -1)`
-            read_w_linear_idx = Linear(dummy, self.mem_size, mem_size=self.mem_size) 
+            read_w_linear_idx = Linear(dummy, self.mem_size, is_range=True)
             read_w_init = tf.scatter_update(read_w_init, [idx], tf.nn.softmax(read_w_linear_idx))
 
             read_init_idx = tf.tanh(Linear(dummy, self.mem_dim))
@@ -77,15 +76,18 @@ class NTM(object):
             output_init.append(tf.tanh(Linear(dummy, self.controller_dim)))
             hidden_init.append(tf.tanh(Linear(dummy, self.controller_dim)))
 
+        new_output= tf.tanh(Linear(dummy, self.output_dim, bias=True, bias_init=1))
+
         inputs = {
             'input': dummy,
         }
         outputs = {
-            'output': output_init,
+            'new_output': new_output,
             'M': M_init,
             'read_w': read_w_init,
             'write_w': write_w_init,
-            'read': read_init,
+            'read': tf.reshape(read_init, [self.read_head_size, self.mem_dim]),
+            'output': output_init,
             'hidden': hidden_init
         }
         return inputs, outputs
@@ -289,10 +291,12 @@ class NTM(object):
         self.depth += 1
         
         if self.depth == 1:
+            #import ipdb; ipdb.set_trace() 
             prev_outputs = self.sess.run([
-                    self.init_output_cell['output'][-1], self.init_output_cell['hidden'][-1],
+                    self.init_output_cell['new_output'],
                     self.init_output_cell['M'], self.init_output_cell['read_w'],
                     self.init_output_cell['write_w'], self.init_output_cell['read'],
+                    self.init_output_cell['output'][-1], self.init_output_cell['hidden'][-1]
                 ], feed_dict={
                     self.init_input_cell['input']: [[0.0]]
                 }
@@ -308,18 +312,19 @@ class NTM(object):
             self.input_cells.append(cur_input_cell)
             self.output_cells.append(cur_output_cell)
 
+        import ipdb; ipdb.set_trace() 
         outputs = self.sess.run([
                 cur_output_cell['new_output'],
-                cur_output_cell['output'][-1], cur_output_cell['M'], cur_output_cell['hidden'][-1],
-                cur_output_cell['read_w'], cur_output_cell['write_w'], cur_output_cell['read'],
+                cur_output_cell['M'], cur_output_cell['read_w'], cur_output_cell['write_w'],
+                cur_output_cell['read'], cur_output_cell['output'][-1], cur_output_cell['hidden'][-1]
             ], feed_dict = {
                 cur_input_cell['input']: input,
-                cur_input_cell['M_prev']: prev_outputs['M'],
-                cur_input_cell['read_w_prev']: prev_outputs['read_w'],
-                cur_input_cell['write_w_prev']: prev_outputs['write_w'],
-                cur_input_cell['read_prev']: prev_outputs['read'],
-                cur_input_cell['output_prev']: prev_outputs['output'],
-                cur_input_cell['hidden_prev']: prev_outputs['hidden']
+                cur_input_cell['M_prev']: prev_outputs[1],
+                cur_input_cell['read_w_prev']: prev_outputs[2],
+                cur_input_cell['write_w_prev']: prev_outputs[3],
+                cur_input_cell['read_prev']: prev_outputs[4],
+                cur_input_cell['output_prev']: prev_outputs[5],
+                cur_input_cell['hidden_prev']: prev_outputs[6]
             }
         )
         self.output = outputs[0]
