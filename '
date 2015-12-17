@@ -38,7 +38,7 @@ class NTM(object):
 
         self.master_input_cell, self.master_output_cell = self.build_cell()
         tf.initialize_all_variables().run()
-        self.init_input_cell, self.init_output_cell = self.build_init_cell()
+        #self.init_input_cell, self.init_output_cell = self.build_init_cell()
 
     def build_init_cell(self):
         # always zero
@@ -89,10 +89,10 @@ class NTM(object):
 
     # Build a NTM cell which shares weights with "master" cell.
     def build_cell(self):
-        input = tf.placeholder(tf.float32, [1, self.input_dim], name='build_cell_input')
+        input = tf.placeholder(tf.float32, [1, self.input_dim])
 
         # previous memory state
-        M_prev = tf.placeholder(tf.float32, [self.mem_size, self.mem_dim], name='build_cell_M_prev')
+        M_prev = tf.placeholder(tf.float32, [self.mem_size, self.mem_dim])
 
         # previous read/write weights
         read_w_prev = tf.placeholder(tf.float32, [self.read_head_size, self.mem_size])

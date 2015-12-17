@@ -53,17 +53,20 @@ def CircularConvolution(vector, kernel):
     size = int(vector.get_shape()[0])
     kernel_size = int(kernel.get_shape()[0])
     kernel_shift = int(math.floor(kernel_size/2.0))
-    output = tf.Variable(tf.zeros_like(vector))
+    output = tf.zeros_like(vector)
 
     def loop(idx):
         if idx < 0: return size + idx
         if idx >= size : return idx - size
         else: return idx
 
+    kernels = []
     for i in xrange(size):
         indices = [loop(i+j) for j in xrange(kernel_shift, -kernel_shift-1, -1)]
         v = tf.gather(vector, indices)
-        output = tf.scatter_add(output, [i], tf.reduce_sum(v * kernel, 0, keep_dims=True))
+        kernels.append(tf.reduce_sum(v * kernel, 0, keep_dims=True))
+
+    output = tf.dynamic_stitch([[i] for i in xrange(size)], kernels)
 
     # # code with double loop
     # for i in xrange(size):
