@@ -51,7 +51,7 @@ class NTM(object):
             dummy = tf.placeholder(tf.float32, [1, 1], name='dummy')
 
             # memory
-            M_init_linear = tf.tanh(Linear(dummy, self.mem_size * self.mem_dim, bias=True, name='M_init_linear'))
+            M_init_linear = tf.tanh(Linear(dummy, self.mem_size * self.mem_dim, name='M_init_linear'))
             M_init = tf.reshape(M_init_linear, [self.mem_size, self.mem_dim])
 
             # read weights
@@ -70,7 +70,8 @@ class NTM(object):
             # write weights
             write_w_init = tf.Variable(tf.zeros([self.write_head_size, self.mem_size]))
             for idx in xrange(self.write_head_size):
-                write_w_linear_idx = Linear(dummy, self.mem_size, name='write_w_linear_%s' % idx)
+                write_w_linear_idx = Linear(dummy, self.mem_size, is_range=True,
+                                            name='write_w_linear_%s' % idx)
                 write_w_init = tf.scatter_update(write_w_init, [idx], tf.nn.softmax(write_w_linear_idx))
 
             # controller state
@@ -89,7 +90,7 @@ class NTM(object):
                     )
                 )
 
-            new_output= tf.tanh(Linear(dummy, self.output_dim, bias=True, bias_init=1, name='new_output'))
+            new_output= tf.tanh(Linear(dummy, self.output_dim, name='new_output'))
 
             inputs = {
                 'input': dummy,
@@ -188,7 +189,8 @@ class NTM(object):
             # Cosine similarity
             similarity = SmoothCosineSimilarity(M_prev, k) # [mem_size x 1]
             # Focusing by content
-            content_focused_w = tf.nn.softmax(ScalarMul(similarity, beta))
+            content_focused_w_lin = tf.nn.softmax(tf.reshape(ScalarMul(similarity, beta), [1, self.mem_size]))
+            content_focused_w = tf.reshape(content_focused_w_lin, [self.mem_size, 1])
 
             # 3.3.2
             # Focusing by location

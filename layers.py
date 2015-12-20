@@ -3,7 +3,7 @@ import tensorflow as tf
 
 from utils import *
 
-def Linear(inputs, output_size, stddev=0.5, bias=True, bias_init=0.0, name=None, is_range=False, reuse=None):
+def Linear(inputs, output_size, stddev=0.5, name=None, is_range=False, reuse=None):
     with tf.variable_scope("Linear", reuse=reuse):
         total_input_size = 0
         if type(inputs) != list:
@@ -28,16 +28,17 @@ def Linear(inputs, output_size, stddev=0.5, bias=True, bias_init=0.0, name=None,
         else:
             mul = tf.matmul(tf.concat(1, inputs), w)
 
-        if bias:
-            if is_range:
-                range_ = tf.cast(tf.reverse(tf.range(1, output_size+1, 1), [True]), tf.float32)
-                b = tf.get_variable(b_name, [output_size], tf.float32, tf.zeros_initializer)
-                b.assign_add(range_)
-            else:
-                b = tf.get_variable(b_name, [output_size], tf.float32, tf.zeros_initializer)
-            return tf.nn.bias_add(mul, b)
+        if is_range:
+            def identity_initializer(tensor):
+                def _initializer(shape, dtype=tf.float32):
+                    return tf.identity(tensor)
+                return _initializer
+
+            range_ = tf.cast(tf.reverse(tf.range(1, output_size+1, 1), [True]), tf.float32)
+            b = tf.get_variable(b_name, [output_size], tf.float32, identity_initializer(range_))
         else:
-            return mul
+            b = tf.get_variable(b_name, [output_size], tf.float32, tf.random_normal_initializer(stddev=stddev))
+        return tf.nn.bias_add(mul, b)
 
 def SmoothCosineSimilarity(M_prev, k):
     M_dim_norm = tf.reshape(tf.sqrt(tf.reduce_sum(tf.mul(M_prev, M_prev),1)), [-1, 1])
