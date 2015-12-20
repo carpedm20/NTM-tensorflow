@@ -37,6 +37,7 @@ class NTM(object):
         self.prev_outputs = []
 
         with tf.variable_scope("cell") as scope:
+            self.cell_scope = scope
             self.master_input_cell, self.master_output_cell = self.build_cell()
         self.init_input_cell, self.init_output_cell = self.build_init_cell()
 
@@ -47,10 +48,10 @@ class NTM(object):
     def build_init_cell(self):
         with tf.variable_scope("init_cell"):
             # always zero
-            dummy = tf.placeholder(tf.float32, [1, 1])
+            dummy = tf.placeholder(tf.float32, [1, 1], name='dummy')
 
             # memory
-            M_init_linear = tf.tanh(Linear(dummy, self.mem_size * self.mem_dim, bias=True))
+            M_init_linear = tf.tanh(Linear(dummy, self.mem_size * self.mem_dim, bias=True, name='M_init_linear'))
             M_init = tf.reshape(M_init_linear, [self.mem_size, self.mem_dim])
 
             # read weights
@@ -59,33 +60,36 @@ class NTM(object):
 
             for idx in xrange(self.read_head_size):
                 # initialize bias distribution with `tf.range(mem_size-2, 0, -1)`
-                read_w_linear_idx = Linear(dummy, self.mem_size, is_range=True)
+                read_w_linear_idx = Linear(dummy, self.mem_size, is_range=True,
+                                           name='read_w_linear_%s' % idx)
                 read_w_init = tf.scatter_update(read_w_init, [idx], tf.nn.softmax(read_w_linear_idx))
 
-                read_init_idx = tf.tanh(Linear(dummy, self.mem_dim))
+                read_init_idx = tf.tanh(Linear(dummy, self.mem_dim, name='read_init_%s' % idx))
                 read_init = tf.scatter_update(read_init, [idx], tf.reshape(read_init_idx, [1, 1, self.mem_dim]))
 
             # write weights
             write_w_init = tf.Variable(tf.zeros([self.write_head_size, self.mem_size]))
             for idx in xrange(self.write_head_size):
-                write_w_linear_idx = Linear(dummy, self.mem_size)
+                write_w_linear_idx = Linear(dummy, self.mem_size, name='write_w_linear_%s' % idx)
                 write_w_init = tf.scatter_update(write_w_init, [idx], tf.nn.softmax(write_w_linear_idx))
 
             # controller state
-            output_init = tf.Variable(tf.zeros([self.controller_layer_size, self.output_dim]))
+            output_init = tf.Variable(tf.zeros([self.controller_layer_size, self.controller_dim]))
             hidden_init = tf.Variable(tf.zeros([self.controller_layer_size, self.controller_dim]))
 
             for idx in xrange(self.controller_layer_size):
-                hidden_init = tf.scatter_update(hidden_init, [idx], tf.reshape(
-                        tf.tanh(Linear(dummy, self.controller_dim)), [1, self.controller_dim]
+                output_init = tf.scatter_update(output_init, [idx], tf.reshape(
+                        tf.tanh(Linear(dummy, self.controller_dim, name='output_init_%s' % idx)),
+                        [1, self.controller_dim]
                     )
                 )
-                output_init = tf.scatter_update(output_init, [idx], tf.reshape(
-                        tf.tanh(Linear(dummy, self.output_dim)), [1, self.output_dim]
+                hidden_init = tf.scatter_update(hidden_init, [idx], tf.reshape(
+                        tf.tanh(Linear(dummy, self.controller_dim, name='hidden_init_%s' % idx)),
+                        [1, self.controller_dim]
                     )
                 )
 
-            new_output= tf.tanh(Linear(dummy, self.output_dim, bias=True, bias_init=1))
+            new_output= tf.tanh(Linear(dummy, self.output_dim, bias=True, bias_init=1, name='new_output'))
 
             inputs = {
                 'input': dummy,
@@ -109,21 +113,22 @@ class NTM(object):
         M_prev = tf.placeholder(tf.float32, [self.mem_size, self.mem_dim], name='build_cell_M_prev')
 
         # previous read/write weights
-        read_w_prev = tf.placeholder(tf.float32, [self.read_head_size, self.mem_size])
-        write_w_prev = tf.placeholder(tf.float32, [self.write_head_size, self.mem_size])
+        read_w_prev = tf.placeholder(tf.float32, [self.read_head_size, self.mem_size], name='read_w_prev')
+        write_w_prev = tf.placeholder(tf.float32, [self.write_head_size, self.mem_size], name='write_w_prev')
 
         # previous vector read from memory
-        read_prev = tf.placeholder(tf.float32, [1, self.mem_dim])
+        read_prev = tf.placeholder(tf.float32, [self.read_head_size, self.mem_dim], name='read_prev')
 
         # previous LSTM controller output
-        output_prev = tf.placeholder(tf.float32, [self.controller_layer_size, self.output_dim])
-        hidden_prev = tf.placeholder(tf.float32, [self.controller_layer_size, self.controller_dim])
+        output_prev = tf.placeholder(tf.float32, [self.controller_layer_size, self.controller_dim], name='output_prev')
+        hidden_prev = tf.placeholder(tf.float32, [self.controller_layer_size, self.controller_dim], name='hidden_prev')
 
         # output and hidden states of controller module
         output, hidden = self.build_controller(input, read_prev, output_prev, hidden_prev)
 
         # last output layer from LSTM controller
-        last_output = output if self.controller_layer_size == 1 else output[-1]
+        last_output = output if self.controller_layer_size == 1 \
+                             else tf.reshape(tf.gather(output, self.controller_layer_size - 1), [1, -1])
 
         # Build a memory
         M, read_w, write_w, read = self.build_memory(M_prev, read_w_prev, write_w_prev, last_output)
@@ -149,33 +154,35 @@ class NTM(object):
         }
         return inputs, outputs
 
-    def build_read_head(self, M_prev, read_w_prev, last_output):
-        return self.build_head(M_prev, read_w_prev, last_output, True)
-
-    def build_write_head(self, M_prev, write_w_prev, last_output):
-        return self.build_head(M_prev, write_w_prev, last_output, False)
-
     def build_output(self, output):
-        return tf.sigmoid(Linear(output, self.output_dim))
+        with tf.variable_scope('output'):
+            return tf.sigmoid(Linear(output, self.output_dim, name='output'))
 
-    def build_head(self, M_prev, w_prev, last_output, is_read):
+    def build_read_head(self, M_prev, read_w_prev, last_output, idx):
+        return self.build_head(M_prev, read_w_prev, last_output, True, idx)
+
+    def build_write_head(self, M_prev, write_w_prev, last_output, idx):
+        return self.build_head(M_prev, write_w_prev, last_output, False, idx)
+
+    def build_head(self, M_prev, w_prev, last_output, is_read, idx):
         scope = 'read' if is_read else 'write'
 
         with tf.variable_scope(scope):
             # Figure 2.
             # Amplify or attenuate the precision
             with tf.variable_scope("k"):
-                k = tf.tanh(Linear(last_output, self.mem_dim))
+                k = tf.tanh(Linear(last_output, self.mem_dim, name='k_%s' % idx))
             # Interpolation gate
             with tf.variable_scope("g"):
-                g = tf.sigmoid(Linear(last_output, 1))
+                g = tf.sigmoid(Linear(last_output, 1, name='g_%s' % idx))
             # shift weighting
             with tf.variable_scope("s_w"):
-                s_w = tf.reshape(tf.nn.softmax(Linear(last_output, 2 * self.shift_range + 1)), [-1, 1])
+                w = Linear(last_output, 2 * self.shift_range + 1, name='s_w_%s' % idx)
+                s_w = tf.reshape(tf.nn.softmax(w), [-1, 1])
             with tf.variable_scope("beta"):
-                beta  = tf.nn.softplus(Linear(last_output, 1))
+                beta  = tf.nn.softplus(Linear(last_output, 1, name='beta_%s' % idx))
             with tf.variable_scope("gamma"):
-                gamma = tf.add(tf.nn.softplus(Linear(last_output, 1)), tf.constant(1.0))
+                gamma = tf.add(tf.nn.softplus(Linear(last_output, 1, name='gamma_%s' % idx)), tf.constant(1.0))
 
             # 3.3.1
             # Cosine similarity
@@ -199,12 +206,14 @@ class NTM(object):
 
             if is_read:
                 # 3.1 Reading
-                read = M_prev * w
-                return w, read
+                read = tf.batch_matmul(
+                    tf.reshape(M_prev, [1, self.mem_size, self.mem_dim]),
+                    tf.reshape(w, [1, self.mem_size, 1]) , adj_x=True)
+                return w, tf.reshape(read, [self.mem_dim, 1])
             else:
                 # 3.2 Writing
-                erase = tf.sigmoid(Linear(last_output, self.mem_dim)) # [1 x mem_dim]
-                add = tf.tanh(Linear(last_output, self.mem_dim))
+                erase = tf.sigmoid(Linear(last_output, self.mem_dim, name='erase_%s' % idx)) # [1 x mem_dim]
+                add = tf.tanh(Linear(last_output, self.mem_dim, name='add_%s' % idx))
                 return w, add, erase
 
     # build a memory to read & write
@@ -212,7 +221,7 @@ class NTM(object):
         with tf.variable_scope("memory"):
             # 3.1 Reading
             if self.read_head_size == 1:
-                read_w, read = self.build_read_head(M_prev, tf.reshape(read_w_prev, [-1, 1]), last_output)
+                read_w, read = self.build_read_head(M_prev, tf.reshape(read_w_prev, [-1, 1]), last_output, 0)
             else:
                 read_w = tf.Variable(tf.zeros([self.read_head_size, self.mem_size]))
                 read = tf.Variable(tf.zeros([self.read_head_size, self.mem_size, self.mem_dim]))
@@ -220,14 +229,15 @@ class NTM(object):
                 for idx in xrange(self.read_head_size):
                     read_w_prev_idx = tf.reshape(tf.gather(read_w_prev, idx), [-1, 1])
 
-                    read_w_idx, read_idx = self.build_read_head(M_prev, read_w_prev_idx, last_output)
+                    read_w_idx, read_idx = self.build_read_head(M_prev, read_w_prev_idx, last_output, idx)
 
                     read_w = tf.scatter_update(read_w, [idx], tf.transpose(read_w_idx))
                     read = tf.scatter_update(read, [idx], tf.reshape(read_idx, [1, self.mem_size, self.mem_dim]))
 
             # 3.2 Writing
             if self.write_head_size == 1:
-                write_w, write, erase = self.build_write_head(M_prev, tf.reshape(write_w_prev, [-1, 1]), last_output)
+                write_w, write, erase = self.build_write_head(M_prev, tf.reshape(write_w_prev, [-1, 1]),
+                                                              last_output, 0)
 
                 M_erase = tf.ones([self.mem_size, self.mem_dim]) - OuterProd(write_w, erase)
                 M_write = OuterProd(write_w, write)
@@ -242,7 +252,8 @@ class NTM(object):
                 for idx in xrange(self.write_head_size):
                     write_w_prev_idx = tf.reshape(tf.gather(write_w_prev, idx), [-1, 1])
 
-                    write_w_idx, write_idx, erase_idx = self.build_write_head(M_prev, write_w_prev_idx, last_output)
+                    write_w_idx, write_idx, erase_idx = self.build_write_head(M_prev, write_w_prev_idx,
+                                                                              last_output, idx)
 
                     write_w = tf.scatter_update(write_w, [idx], tf.transpose(write_w_idx))
                     write = tf.scatter_update(write, [idx], tf.reshape(write_idx, [1, self.mem_size, self.mem_dim]))
@@ -261,7 +272,8 @@ class NTM(object):
     # Build a LSTM controller
     def build_controller(self, input, read_prev, output_prev, hidden_prev):
         with tf.variable_scope("controller"):
-            output, hidden = [], []
+            output = tf.Variable(tf.zeros([self.controller_layer_size, self.controller_dim]))
+            hidden = tf.Variable(tf.zeros([self.controller_layer_size, self.controller_dim]))
             for layer_idx in xrange(self.controller_layer_size):
                 if self.controller_layer_size == 1:
                     o_prev = output_prev
@@ -271,45 +283,51 @@ class NTM(object):
                     h_prev = tf.reshape(tf.gather(hidden_prev, layer_idx), [1, -1])
 
                 if layer_idx == 0:
-                    def new_gate():
+                    def new_gate(gate_name):
                         in_modules = [
-                            Linear(input, self.controller_dim),
-                            Linear(o_prev, self.controller_dim),
+                            Linear(input, self.controller_dim,
+                                   name='%s_gate_1_%s' % (gate_name, layer_idx)),
+                            Linear(o_prev, self.controller_dim,
+                                   name='%s_gate_2_%s' % (gate_name, layer_idx)),
                         ]
                         if self.read_head_size == 1:
                             in_modules.append(
-                                Linear(read_prev, self.controller_dim)
+                                Linear(read_prev, self.controller_dim,
+                                       name='%s_gate_3_%s' % (gate_name, layer_idx))
                             )
                         else:
                             for read_idx in xrange(self.read_head_size):
                                 vec = tf.reshape(tf.gather(read_prev, read_idx), [1, -1])
                                 in_modules.append(
-                                    Linear(vec, self.controller_dim)
+                                    Linear(vec, self.controller_dim,
+                                           name='%s_gate_3_%s_%s' % (gate_name, layer_idx, read_idx))
                                 )
                         return tf.add_n(in_modules)
                 else:
-                    def new_gate():
+                    def new_gate(gate_name):
                         return tf.add_n([
-                            Linear(output[layer_idx-1], self.controller_dim),
-                            Linear(o_prev, self.controller_dim),
+                            Linear(tf.reshape(tf.gather(output, layer_idx-1), [1, -1]),
+                                   self.controller_dim, name='%s_gate_1_%s' % (gate_name, layer_idx)),
+                            Linear(o_prev, self.controller_dim,
+                                   name='%s_gate_2_%s' % (gate_name, layer_idx)),
                         ])
 
                 # input, forget, and output gates for LSTM
-                i = tf.sigmoid(new_gate())
-                f = tf.sigmoid(new_gate())
-                o = tf.sigmoid(new_gate())
-                update = tf.tanh(new_gate())
+                i = tf.sigmoid(new_gate('input'))
+                f = tf.sigmoid(new_gate('forget'))
+                o = tf.sigmoid(new_gate('output'))
+                update = tf.tanh(new_gate('update'))
 
                 # update the sate of the LSTM cell
-                hidden.append(tf.add_n([f * h_prev, i * update]))
-                output.append(o * tf.tanh(hidden[layer_idx]))
+                hidden = tf.scatter_update(hidden, [layer_idx],
+                                           tf.add_n([f * h_prev, i * update]))
+                output = tf.scatter_update(output, [layer_idx],
+                                           o * tf.tanh(tf.gather(hidden,layer_idx)))
 
             return output, hidden
 
     def forward(self, input):
-        self.depth += 1
-        
-        if self.depth == 1:
+        if self.depth == 0:
             prev_outputs = self.sess.run([
                     self.init_output_cell['new_output'],
                     self.init_output_cell['M'], self.init_output_cell['read_w'],
@@ -319,6 +337,7 @@ class NTM(object):
                     self.init_input_cell['input']: [[0.0]]
                 }
             )
+            self.prev_outputs.append(prev_outputs)
         else:
             prev_outputs = self.prev_outputs[self.depth - 1]
 
@@ -326,16 +345,18 @@ class NTM(object):
             cur_input_cell = self.input_cells[self.depth]
             cur_output_cell = self.output_cells[self.depth]
         except:
-            with tf.variable_scope("cell", reuse=True):
+            with tf.variable_scope(self.cell_scope, reuse=True):
                 cur_input_cell, cur_output_cell = self.build_cell()
-                #self.sess.run(tf.initialize_all_variables())
+                self.sess.run(tf.initialize_all_variables())
                 self.input_cells.append(cur_input_cell)
                 self.output_cells.append(cur_output_cell)
+        #cur_input_cell = self.master_input_cell
+        #cur_output_cell = self.master_output_cell
 
         outputs = self.sess.run([
                 cur_output_cell['new_output'],
                 cur_output_cell['M'], cur_output_cell['read_w'], cur_output_cell['write_w'],
-                cur_output_cell['read'], cur_output_cell['output'][-1], cur_output_cell['hidden'][-1]
+                cur_output_cell['read'], cur_output_cell['output'], cur_output_cell['hidden']
             ], feed_dict = {
                 cur_input_cell['input']: input,
                 cur_input_cell['M_prev']: prev_outputs[1],
@@ -346,9 +367,14 @@ class NTM(object):
                 cur_input_cell['hidden_prev']: prev_outputs[6]
             }
         )
+        outputs[2] = outputs[2].T
+        outputs[3] = outputs[3].T
+        outputs[4] = outputs[4].T
         self.output = outputs[0]
-        self.prev_outputs = outputs
+        self.prev_outputs.append(outputs)
 
+        self.depth += 1
+        
         return self.output
 
     def get_memory(self, depth=None):

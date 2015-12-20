@@ -3,39 +3,42 @@ import tensorflow as tf
 
 from utils import *
 
-def Linear(inputs, output_size, stddev=0.5, bias=True, bias_init=0.0, name=None, is_range=False):
-    total_input_size = 0
-    if type(inputs) != list:
-        inputs = [inputs]
-    shapes = [a.get_shape().as_list() for a in inputs]
+def Linear(inputs, output_size, stddev=0.5, bias=True, bias_init=0.0, name=None, is_range=False, reuse=None):
+    with tf.variable_scope("Linear", reuse=reuse):
+        total_input_size = 0
+        if type(inputs) != list:
+            inputs = [inputs]
+        shapes = [a.get_shape().as_list() for a in inputs]
 
-    for shape in shapes:
-        if len(shape) != 2:
-            raise ValueError("Linear is expecting 2D inputuments: %s" % str(shapes))
-        if not shape[1]:
-            raise ValueError("Linear expects shape[1] of inputuments: %s" % str(shapes))
+        for shape in shapes:
+            if len(shape) != 2:
+                raise ValueError("Linear is expecting 2D inputuments: %s" % str(shapes))
+            if not shape[1]:
+                raise ValueError("Linear expects shape[1] of inputuments: %s" % str(shapes))
+            else:
+                total_input_size += shape[1]
+
+        w_name = "%s_w" % name if name else None
+        b_name = "%s_b" % name if name else None
+
+        w = tf.get_variable(w_name, [total_input_size, output_size], tf.float32,
+                            tf.random_normal_initializer(stddev=stddev))
+        print w_name, w
+        if len(inputs) == 1:
+            mul = tf.matmul(inputs[0], w)
         else:
-            total_input_size += shape[1]
+            mul = tf.matmul(tf.concat(1, inputs), w)
 
-    w_name = "%s_w" % name if name else None
-    b_name = "%s_b" % name if name else None
-
-    w = tf.identity(tf.random_normal([total_input_size, output_size], stddev=stddev, \
-                                      name=w_name))
-    if len(inputs) == 1:
-      mul = tf.matmul(inputs[0], w)
-    else:
-      mul = tf.matmul(tf.concat(1, inputs), w)
-
-    if bias:
-        if is_range:
-            range_ = tf.reverse(tf.range(1, output_size+1, 1), [True])
-            b = tf.Variable(tf.cast(range_, dtype=tf.float32))
+        if bias:
+            if is_range:
+                range_ = tf.cast(tf.reverse(tf.range(1, output_size+1, 1), [True]), tf.float32)
+                b = tf.get_variable(b_name, [output_size], tf.float32, tf.zeros_initializer)
+                b.assign_add(range_)
+            else:
+                b = tf.get_variable(b_name, [output_size], tf.float32, tf.zeros_initializer)
+            return tf.nn.bias_add(mul, b)
         else:
-            b = tf.Variable(tf.constant(bias_init, shape=[output_size], dtype=tf.float32))
-        return tf.nn.bias_add(mul, b)
-    else:
-        return mul
+            return mul
 
 def SmoothCosineSimilarity(M_prev, k):
     M_dim_norm = tf.reshape(tf.sqrt(tf.reduce_sum(tf.mul(M_prev, M_prev),1)), [-1, 1])

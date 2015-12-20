@@ -20,9 +20,9 @@ end_symbol = np.zeros(input_dim)
 end_symbol[2] = 1
 
 def generate_sequence(length, bits):
-    seq = np.zeros(length, bits + 2)
+    seq = np.zeros([length, 1, bits + 2])
     for idx in xrange(length):
-        seq[idx, 2:bits+2] = np.random.rand(bits).round()
+        seq[idx, :, 2:bits+2] = np.random.rand(bits).round()
     return seq
 
 def forward(model, seq, print_flag):
