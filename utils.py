@@ -3,11 +3,11 @@ try:
 except NameError:
     xrange = range
 
-def InputCell(object):
-    def __init__(self, **entries): 
-        self.__dict__.update(entries)
-
-def OutputCell(object):
-    def __init__(self, **entries): 
-        self.__dict__.update(entries)
-
+def argmax(x):
+    index = 0
+    max_num = x[index]
+    for idx in xrange(1, len(x)-1):
+        if x[idx] > max_num:
+            index = idx
+            max_num = x[idx]
+    return index, max_num

@@ -23,7 +23,6 @@ def Linear(inputs, output_size, stddev=0.5, bias=True, bias_init=0.0, name=None,
 
         w = tf.get_variable(w_name, [total_input_size, output_size], tf.float32,
                             tf.random_normal_initializer(stddev=stddev))
-        print w_name, w
         if len(inputs) == 1:
             mul = tf.matmul(inputs[0], w)
         else:

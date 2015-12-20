@@ -337,7 +337,7 @@ class NTM(object):
                     self.init_input_cell['input']: [[0.0]]
                 }
             )
-            self.prev_outputs.append(prev_outputs)
+            self.initial_values = prev_outputs
         else:
             prev_outputs = self.prev_outputs[self.depth - 1]
 
@@ -379,7 +379,34 @@ class NTM(object):
 
     def get_memory(self, depth=None):
         if self.depth == 0:
-            inputs, outputs = self.init_cell()
-            return outputs['M_init']
-        #depth = depth if depth or self.depth
-        return self.cells[depth]
+            return prev_outputs[1]
+        depth = depth if depth else self.depth
+        return self.prev_outputs[depth - 1][1]
+
+    def get_read_weights(self, depth=None):
+        if self.depth == 0:
+            return prev_outputs[2]
+        depth = depth if depth else self.depth
+        return self.prev_outputs[depth - 1][2]
+
+    def get_write_weights(self, depth=None):
+        if self.depth == 0:
+            return prev_outputs[3]
+        depth = depth if depth else self.depth
+        return self.prev_outputs[depth - 1][3]
+
+    def get_read_vector(self, depth=None):
+        if self.depth == 0:
+            return prev_outputs[4]
+        depth = depth if depth else self.depth
+        return self.prev_outputs[depth - 1][4]
+
+    def print_read_max(self):
+        read_w = self.get_write_weights()
+
+        fmt = "%-4d %.4f"
+        if self.read_head_size == 1:
+            print(fmt % (argmax(read_w[0])))
+        else:
+            for idx in xrange(self.read_head_size):
+                print(fmt % np.argmax(read_w[idx]))
