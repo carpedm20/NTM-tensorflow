@@ -1,4 +1,4 @@
-def smooth_cosine_similarity(m, v, name=None):
+def smooth_cosine_similarity(m, v):
     """Compute smooth cosine similarity.
 
     Args:
@@ -17,7 +17,7 @@ def smooth_cosine_similarity(m, v, name=None):
     similarity = tf.div(m_dot_v, (m_norm * k_norm + 1e-3))
     return similarity
 
-def circular_convolution(m, v, name=None):
+def circular_convolution(m, v):
     """Compute circular convolution
 
     Args:
@@ -53,7 +53,7 @@ def circular_convolution(m, v, name=None):
 
     return output
 
-def outer_product(*inputs, name=None):
+def outer_product(*inputs):
     """Compute outer product
 
     Args:

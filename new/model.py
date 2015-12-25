@@ -1,4 +1,6 @@
-from __future__ import division, print_function, absolute_import
+from __future__ import division
+from __futere__ import print_function
+from __future__ import absolute_import
 from functools import reduce
 
 import numpy as np
@@ -9,10 +11,28 @@ from tensorflow.python.ops import array_ops
 from utils import *
 from layers import *
 
-class NTM(object):
-    def __init__(self, config=None, sess=None):
-        self.sess = sess
-
+class NTMCell(object):
+    def __init__(self, input_dim, output_dim,
+                 mem_size=128, mem_dim=20, controller_dim=100,
+                 controller_layer_size=1, shift_range=1,
+                 write_head_size=1, read_head_size=1,
+                 lr_rate=1e-4):
+        """Initialize the parameters for an NTM cell.
+        Args:
+            input_dim: int, The number of units in the LSTM cell
+            output_dim: int, The dimensionality of the inputs into the LSTM cell
+            mem_dim: (optional) int, set True to enable diagonal/peephole connections.
+            cell_clip: (optional) A float value, if provided the cell state is clipped
+                by this value prior to the cell output activation.
+            initializer: (optional) The initializer to use for the weight and
+                projection matrices.
+            num_proj: (optional) int, The output dimensionality for the projection
+                matrices.  If None, no projection is performed.
+            num_unit_shards: How to split the weight matrix.  If >1, the weight
+                matrix is stored across num_unit_shards.
+            num_proj_shards: How to split the projection matrix.  If >1, the
+                projection matrix is stored across num_proj_shards.
+        """
         # initialize configs
         self.input_dim = config.input_dim
         self.output_dim = config.output_dim
