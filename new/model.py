@@ -1,6 +1,6 @@
-from __future__ import division
-from __futere__ import print_function
 from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 from functools import reduce
 
 import numpy as np
@@ -9,7 +9,7 @@ import tensorflow as tf
 from tensorflow.python.ops import array_ops
 
 from utils import *
-from layers import *
+from ops import *
 
 class NTMCell(object):
     def __init__(self, input_dim, output_dim,
@@ -34,16 +34,16 @@ class NTMCell(object):
                 projection matrix is stored across num_proj_shards.
         """
         # initialize configs
-        self.input_dim = config.input_dim
-        self.output_dim = config.output_dim
-        self.mem_size = config.mem_size
-        self.mem_dim = config.mem_dim
-        self.controller_dim = config.controller_dim
-        self.controller_layer_size = config.controller_layer_size
-        self.shift_range = config.shift_range
-        self.write_head_size = config.write_head_size
-        self.read_head_size = config.read_head_size
-        self.current_lr = config.lr_rate
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        self.mem_size = mem_size
+        self.mem_dim = mem_dim
+        self.controller_dim = controller_dim
+        self.controller_layer_size = controller_layer_size
+        self.shift_range = shift_range
+        self.write_head_size = write_head_size
+        self.read_head_size = read_head_size
+        self.current_lr = lr_rate
 
         self.depth = 0
         self.input_cells = []
@@ -78,14 +78,14 @@ class NTMCell(object):
             read_init_list = []
 
             for idx in xrange(self.read_head_size):
-                # initialize bias distribution with `tf.range(mem_size-2, 0, -1)`
-                read_w_linear_idx = Linear(dummy, self.mem_size, is_range=True,
-                                           name='read_w_linear_%d' % idx)
-                read_w_init_list.append(tf.nn.softmax(read_w_linear_idx))
+                read_w_idx = Linear(dummy, self.mem_size, is_range=True, 
+                                    squeeze=True, name='read_w_%d' % idx)
+                import ipdb; ipdb.set_trace() 
+                read_w_init_list.append(tf.nn.softmax(read_w_idx))
 
-                read_init_idx = tf.tanh(Linear(dummy, self.mem_dim,
-                                        name='read_init_%d' % idx))
-                read_init_list.append(read_init_idx)
+                read_init_idx = Linear(dummy, self.mem_dim,
+                                       squeeze=True, name='read_init_%d' % idx)
+                read_init_list.append(tf.tanh(read_init_idx))
 
             read_w_init = array_ops.pack(read_w_init_list)
             read_init_list = array_ops.pack(read_init_list)
@@ -93,9 +93,9 @@ class NTMCell(object):
             # write weights
             write_w_init_list = []
             for idx in xrange(self.write_head_size):
-                write_w_linear_idx = Linear(dummy, self.mem_size, is_range=True,
-                                            name='write_w_linear_%s' % idx)
-                write_w_init_list.append(tf.nn.softmax(write_w_linear_idx))
+                write_w_idx = Linear(dummy, self.mem_size, is_range=True,
+                                     squeeze=True, name='write_w_%s' % idx)
+                write_w_init_list.append(tf.nn.softmax(write_w_idx))
 
             write_w_init = array_ops.pack(write_w_init_list)
 

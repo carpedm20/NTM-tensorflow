@@ -1,3 +1,51 @@
+import math
+import tensorflow as tf
+
+from utils import *
+
+def Linear(inputs, output_size, stddev=0.5,
+           is_range=False, squeeze=False,
+           name=None, reuse=None):
+    with tf.variable_scope("Linear", reuse=reuse):
+        total_input_size = 0
+        if type(inputs) != list:
+            inputs = [inputs]
+        shapes = [a.get_shape().as_list() for a in inputs]
+
+        for shape in shapes:
+            if len(shape) != 2:
+                raise ValueError("Linear is expecting 2D inputuments: %s" % str(shapes))
+            if not shape[1]:
+                raise ValueError("Linear expects shape[1] of inputuments: %s" % str(shapes))
+            else:
+                total_input_size += shape[1]
+
+        w_name = "%s_w" % name if name else None
+        b_name = "%s_b" % name if name else None
+
+        w = tf.get_variable(w_name, [total_input_size, output_size], tf.float32,
+                            tf.random_normal_initializer(stddev=stddev))
+        if len(inputs) == 1:
+            mul = tf.matmul(inputs[0], w)
+        else:
+            mul = tf.matmul(tf.concat(1, inputs), w)
+
+        if is_range:
+            def identity_initializer(tensor):
+                def _initializer(shape, dtype=tf.float32):
+                    return tf.identity(tensor)
+                return _initializer
+
+            range_ = tf.cast(tf.reverse(tf.range(1, output_size+1, 1), [True]), tf.float32)
+            b = tf.get_variable(b_name, [output_size], tf.float32, identity_initializer(range_))
+        else:
+            b = tf.get_variable(b_name, [output_size], tf.float32, tf.random_normal_initializer(stddev=stddev))
+
+        if squeeze:
+            return tf.squeeze(tf.nn.bias_add(mul, b))
+        else:
+            return tf.nn.bias_add(mul, b)
+
 def smooth_cosine_similarity(m, v):
     """Compute smooth cosine similarity.
 
