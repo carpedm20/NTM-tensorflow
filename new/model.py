@@ -65,31 +65,41 @@ class NTMCell(object):
     def build_init_cell(self):
         with tf.variable_scope("init_cell"):
             # always zero
-            dummy = tf.placeholder(tf.float32, [1, 1], name='dummy')
+            dummy = tf.placeholder(tf.float32, [])
+            dummy = tf.reshape(dummy, [1, 1], name='dummy')
 
             # memory
-            M_init_linear = tf.tanh(Linear(dummy, self.mem_size * self.mem_dim, name='M_init_linear'))
+            M_init_linear = tf.tanh(Linear(dummy, self.mem_size * self.mem_dim,
+                                    name='M_init_linear'))
             M_init = tf.reshape(M_init_linear, [self.mem_size, self.mem_dim])
 
             # read weights
-            read_w_init = tf.Variable(tf.zeros([self.read_head_size, self.mem_size]))
-            read_init = tf.Variable(tf.zeros([self.read_head_size, 1, self.mem_dim]))
+            read_w_init_list = []
+            read_init_list = []
 
             for idx in xrange(self.read_head_size):
                 # initialize bias distribution with `tf.range(mem_size-2, 0, -1)`
                 read_w_linear_idx = Linear(dummy, self.mem_size, is_range=True,
-                                           name='read_w_linear_%s' % idx)
-                read_w_init = tf.scatter_update(read_w_init, [idx], tf.nn.softmax(read_w_linear_idx))
+                                           name='read_w_linear_%d' % idx)
+                read_w_init_list.append(tf.nn.softmax(read_w_linear_idx))
 
-                read_init_idx = tf.tanh(Linear(dummy, self.mem_dim, name='read_init_%s' % idx))
-                read_init = tf.scatter_update(read_init, [idx], tf.reshape(read_init_idx, [1, 1, self.mem_dim]))
+                read_init_idx = tf.tanh(Linear(dummy, self.mem_dim,
+                                        name='read_init_%d' % idx))
+                read_init_list.append(read_init_idx)
+
+            read_w_init = array_ops.pack(read_w_init_list)
+            read_init_list = array_ops.pack(read_init_list)
 
             # write weights
-            write_w_init = tf.Variable(tf.zeros([self.write_head_size, self.mem_size]))
+            write_w_init_list = []
             for idx in xrange(self.write_head_size):
                 write_w_linear_idx = Linear(dummy, self.mem_size, is_range=True,
                                             name='write_w_linear_%s' % idx)
-                write_w_init = tf.scatter_update(write_w_init, [idx], tf.nn.softmax(write_w_linear_idx))
+                write_w_init_list.append(tf.nn.softmax(write_w_linear_idx))
+
+            write_w_init = array_ops.pack(write_w_init_list)
+
+            import ipdb; ipdb.set_trace() 
 
             # controller state
             output_init = tf.Variable(tf.zeros([self.controller_layer_size, self.controller_dim]))
