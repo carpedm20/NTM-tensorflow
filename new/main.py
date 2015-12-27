@@ -37,9 +37,9 @@ def copy():
             outputs = ntm.forward(seq)
 
 def generate_sequence(length, bits):
-    seq = np.zeros([length, 1, bits + 2], dtype=np.float32)
+    seq = np.zeros([length, bits + 2], dtype=np.float32)
     for idx in xrange(length):
-        seq[idx, :, 2:bits+2] = np.random.rand(bits).round()
+        seq[idx, 2:bits+2] = np.random.rand(bits).round()
     return list(seq)
 
 if __name__ == '__main__':

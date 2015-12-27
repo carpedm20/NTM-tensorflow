@@ -1,37 +1,34 @@
 import math
+import numpy as np 
 import tensorflow as tf
 
 from utils import *
 
-def Linear(inputs, output_size, stddev=0.5,
+def Linear(input_, output_size, stddev=0.5,
            is_range=False, squeeze=False,
            name=None, reuse=None):
     with tf.variable_scope("Linear", reuse=reuse):
-        total_input_size = 0
-        if type(inputs) != list:
-            inputs = [inputs]
-        try:
-            shapes = [input_.get_shape().as_list() for input_ in inputs]
-        except:
-            shapes = [input_.shape for input_ in inputs]
+        if type(input_) == np.ndarray:
+            shape = input_.shape
+        else:
+            shape = input_.get_shape().as_list()
 
-        for shape in shapes:
-            if len(shape) != 2:
-                raise ValueError("Linear is expecting 2D inputuments: %s" % str(shapes))
-            if not shape[1]:
-                raise ValueError("Linear expects shape[1] of inputuments: %s" % str(shapes))
-            else:
-                total_input_size += shape[1]
+        is_vector = False
+        if len(shape) == 1:
+            is_vector = True
+            input_ = tf.reshape(input_, [1, -1])
+            input_size = shape[0]
+        elif len(shape) == 2:
+            input_size = shape[1]
+        else:
+            raise ValueError("Linear expects shape[1] of inputuments: %s" % str(shapes))
 
         w_name = "%s_w" % name if name else None
         b_name = "%s_b" % name if name else None
 
-        w = tf.get_variable(w_name, [total_input_size, output_size], tf.float32,
+        w = tf.get_variable(w_name, [input_size, output_size], tf.float32,
                             tf.random_normal_initializer(stddev=stddev))
-        if len(inputs) == 1:
-            mul = tf.matmul(inputs[0], w)
-        else:
-            mul = tf.matmul(tf.concat(1, inputs), w)
+        mul = tf.matmul(input_, w)
 
         if is_range:
             def identity_initializer(tensor):
@@ -45,9 +42,14 @@ def Linear(inputs, output_size, stddev=0.5,
             b = tf.get_variable(b_name, [output_size], tf.float32, tf.random_normal_initializer(stddev=stddev))
 
         if squeeze:
-            return tf.squeeze(tf.nn.bias_add(mul, b))
+            output = tf.squeeze(tf.nn.bias_add(mul, b))
         else:
-            return tf.nn.bias_add(mul, b)
+            output = tf.nn.bias_add(mul, b)
+
+        if is_vector:
+            return tf.reshape(output, [-1])
+        else:
+            return output
 
 def smooth_cosine_similarity(m, v):
     """Compute smooth cosine similarity.
@@ -57,28 +59,27 @@ def smooth_cosine_similarity(m, v):
         v: a 1-D `Tensor` (vector)
     """
     shape_x = m.get_shape().as_list()
-    shape_y = m.get_shape().as_list()
+    shape_y = v.get_shape().as_list()
     if shape_x[1] != shape_y[0]:
         raise ValueError("Smooth cosine similarity is expecting same dimemsnion")
 
     m_norm = tf.sqrt(tf.reduce_sum(tf.pow(m, 2),1))
-    v_norm = tf.sqrt(tf.matmul(v, v, transpose_b=True))
-    m_dot_v = tf.matmul(m, v, transpose_b=True)
+    v_norm = tf.sqrt(tf.reduce_sum(tf.pow(v, 2)))
+    m_dot_v = tf.matmul(m, tf.reshape(v, [-1, 1]))
 
-    similarity = tf.div(m_dot_v, (m_norm * k_norm + 1e-3))
+    similarity = tf.div(tf.reshape(m_dot_v, [-1]), m_norm * v_norm + 1e-3)
     return similarity
 
-def circular_convolution(m, v):
+def circular_convolution(v, k):
     """Compute circular convolution
 
     Args:
-        m: a 2-D `Tensor` (matrix)
         v: a 1-D `Tensor` (vector)
+        k: a 1-D `Tensor` (kernel)
     """
-    size = vector.get_shape()[0]
-    kernel_size = kernel.get_shape()[0]
-    kernel_shift = math.floor(kernel_size/2.0)
-    output = tf.zeros_like(vector)
+    size = int(v.get_shape()[0])
+    kernel_size = int(k.get_shape()[0])
+    kernel_shift = int(math.floor(kernel_size/2.0))
 
     def loop(idx):
         if idx < 0: return size + idx
@@ -88,10 +89,8 @@ def circular_convolution(m, v):
     kernels = []
     for i in xrange(size):
         indices = [loop(i+j) for j in xrange(kernel_shift, -kernel_shift-1, -1)]
-        v = tf.gather(vector, indices)
-        kernels.append(tf.reduce_sum(v * kernel, 0, keep_dims=True))
-
-    output = tf.dynamic_stitch([[i] for i in xrange(size)], kernels)
+        v_ = tf.gather(v, indices)
+        kernels.append(tf.reduce_sum(v_ * k, 0))
 
     # # code with double loop
     # for i in xrange(size):
@@ -99,19 +98,24 @@ def circular_convolution(m, v):
     #         idx = i + kernel_shift - j + 1
     #         if idx < 0: idx = idx + size
     #         if idx >= size: idx = idx - size
-    #         w = tf.gather(vector, int(idx)) * tf.gather(kernel, j)
+    #         w = tf.gather(v, int(idx)) * tf.gather(kernel, j)
     #         output = tf.scatter_add(output, [i], tf.reshape(w, [1, -1]))
 
-    return output
+    return tf.dynamic_stitch([i for i in xrange(size)], kernels)
 
 def outer_product(*inputs):
     """Compute outer product
 
     Args:
-        m: a 2-D `Tensor` (matrix)
-        v: a 1-D `Tensor` (vector)
+        inputs: a list of 1-D `Tensor` (vector)
     """
+    inputs = list(inputs)
     order = len(inputs)
+
+    for idx, input_ in enumerate(inputs):
+        if len(input_.get_shape()) == 1:
+            inputs[idx] = tf.reshape(input_, [-1, 1] if idx % 2 == 0 else [1, -1])
+
     if order == 2:
         output = tf.mul(inputs[0], inputs[1])
     elif order == 3:

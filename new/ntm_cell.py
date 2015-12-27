@@ -14,8 +14,8 @@ from ops import *
 class NTMCell(object):
     def __init__(self, input_dim, output_dim,
                  mem_size=128, mem_dim=20, controller_dim=100,
-                 controller_layer_size=1, shift_range=1,
-                 write_head_size=1, read_head_size=2,
+                 controller_layer_size=2, shift_range=1,
+                 write_head_size=2, read_head_size=2,
                  lr_rate=1e-4):
         """Initialize the parameters for an NTM cell.
         Args:
@@ -86,7 +86,7 @@ class NTMCell(object):
 
         # last output layer from LSTM controller
         last_output = output if self.controller_layer_size == 1 \
-                             else tf.reshape(tf.gather(output, self.controller_layer_size - 1), [1, -1])
+                             else tf.gather(output, self.controller_layer_size - 1)
 
         # build a memory
         M, read_w, write_w, read = self.build_memory(M_prev, read_w_prev, write_w_prev, last_output)
@@ -118,8 +118,8 @@ class NTMCell(object):
                     o_prev = output_prev
                     h_prev = hidden_prev
                 else:
-                    o_prev = tf.reshape(tf.gather(output_prev, layer_idx), [1, -1])
-                    h_prev = tf.reshape(tf.gather(hidden_prev, layer_idx), [1, -1])
+                    o_prev = tf.gather(output_prev, layer_idx)
+                    h_prev = tf.gather(hidden_prev, layer_idx)
 
                 if layer_idx == 0:
                     def new_gate(gate_name):
@@ -136,7 +136,7 @@ class NTMCell(object):
                             )
                         else:
                             for read_idx in xrange(self.read_head_size):
-                                vec = tf.reshape(tf.gather(read_prev, read_idx), [1, -1])
+                                vec = tf.gather(read_prev, read_idx)
                                 in_modules.append(
                                     Linear(vec, self.controller_dim,
                                            name='%s_gate_3_%s_%s' % (gate_name, layer_idx, read_idx))
@@ -186,7 +186,7 @@ class NTMCell(object):
             # shift weighting
             with tf.variable_scope("s_w"):
                 w = Linear(last_output, 2 * self.shift_range + 1, name='s_w_%s' % idx)
-                s_w = tf.reshape(tf.nn.softmax(w), [-1, 1])
+                s_w = softmax(w)
             with tf.variable_scope("beta"):
                 beta  = tf.nn.softplus(Linear(last_output, 1, name='beta_%s' % idx))
             with tf.variable_scope("gamma"):
@@ -196,18 +196,17 @@ class NTMCell(object):
             # Cosine similarity
             similarity = smooth_cosine_similarity(M_prev, k) # [mem_size x 1]
             # Focusing by content
-            content_focused_w_lin = tf.nn.softmax(tf.reshape(ScalarMul(similarity, beta), [1, self.mem_size]))
-            content_focused_w = tf.reshape(content_focused_w_lin, [self.mem_size, 1])
+            content_focused_w = softmax(scalar_mul(similarity, beta))
 
             # 3.3.2
             # Focusing by location
             gated_w = tf.add_n([
-                ScalarMul(content_focused_w, g),
-                ScalarMul((tf.constant(1.0) - g), w_prev)
+                scalar_mul(content_focused_w, g),
+                scalar_mul(w_prev, (tf.constant(1.0) - g))
             ])
 
             # Convolutional shifts
-            conv_w = CircularConvolution(vector=gated_w, kernel=s_w)
+            conv_w = circular_convolution(gated_w, s_w)
 
             # Sharpening
             powed_conv_w = tf.pow(conv_w, gamma)
@@ -215,10 +214,8 @@ class NTMCell(object):
 
             if is_read:
                 # 3.1 Reading
-                read = tf.batch_matmul(
-                    tf.reshape(M_prev, [1, self.mem_size, self.mem_dim]),
-                    tf.reshape(w, [1, self.mem_size, 1]) , adj_x=True)
-                return w, tf.reshape(read, [self.mem_dim, 1])
+                read = tf.transpose(tf.transpose(M_prev) * w)
+                return w, read
             else:
                 # 3.2 Writing
                 erase = tf.sigmoid(Linear(last_output, self.mem_dim, name='erase_%s' % idx)) # [1 x mem_dim]
@@ -230,29 +227,29 @@ class NTMCell(object):
         with tf.variable_scope("memory"):
             # 3.1 Reading
             if self.read_head_size == 1:
-                read_w, read = self.build_read_head(M_prev, tf.reshape(read_w_prev, [-1, 1]), last_output, 0)
+                read_w, read = self.build_read_head(M_prev, read_w_prev, last_output, 0)
             else:
                 read_w_list = []
                 read_list = []
 
                 for idx in xrange(self.read_head_size):
-                    read_w_prev_idx = tf.reshape(tf.gather(read_w_prev, idx), [-1, 1])
+                    read_w_prev_idx = tf.gather(read_w_prev, idx)
+                    read_w_idx, read_idx = self.build_read_head(M_prev, read_w_prev_idx,
+                                                                last_output, idx)
 
-                    read_w_idx, read_idx = self.build_read_head(M_prev, read_w_prev_idx, last_output, idx)
-
-                    read_w_list.append(tf.transpose(read_w_idx))
-                    read_list.append(tf.reshape(read_idx, [1, self.mem_size, self.mem_dim]))
+                    read_w_list.append(read_w_idx)
+                    read_list.append(read_idx)
 
                 read_w = array_ops.pack(read_w_list)
                 read = array_ops.pack(read_list)
 
             # 3.2 Writing
             if self.write_head_size == 1:
-                write_w, write, erase = self.build_write_head(M_prev, tf.reshape(write_w_prev, [-1, 1]),
+                write_w, write, erase = self.build_write_head(M_prev, write_w_prev,
                                                               last_output, 0)
 
-                M_erase = tf.ones([self.mem_size, self.mem_dim]) - OuterProd(write_w, erase)
-                M_write = OuterProd(write_w, write)
+                M_erase = tf.ones([self.mem_size, self.mem_dim]) - outer_product(write_w, erase)
+                M_write = outer_prod(write_w, write)
             else:
                 write_w_list = []
                 write_list = []
@@ -262,17 +259,17 @@ class NTMCell(object):
                 M_writes = []
 
                 for idx in xrange(self.write_head_size):
-                    write_w_prev_idx = tf.reshape(tf.gather(write_w_prev, idx), [-1, 1])
+                    write_w_prev_idx = tf.gather(write_w_prev, idx)
 
-                    write_w_idx, write_idx, erase_idx = self.build_write_head(M_prev, write_w_prev_idx,
-                                                                              last_output, idx)
+                    write_w_idx, write_idx, erase_idx = \
+                        self.build_write_head(M_prev, write_w_prev_idx, last_output, idx)
 
                     write_w_list.append(tf.transpose(write_w_idx))
-                    write_list.append(tf.reshape(write_idx, [1, self.mem_size, self.mem_dim]))
-                    erase_list.append(tf.reshape(erase_idx, [1, 1, self.mem_dim]))
+                    write_list.append(write_idx)
+                    erase_list.append(erase_idx)
 
-                    M_erases.append(tf.ones([self.mem_size, self.mem_dim]) * OuterProd(write_w_idx, erase_idx))
-                    M_writes.append(OuterProd(write_w_idx, write_idx))
+                    M_erases.append(tf.ones([self.mem_size, self.mem_dim]) * outer_product(write_w_idx, erase_idx))
+                    M_writes.append(outer_product(write_w_idx, write_idx))
 
                 write_w = array_ops.pack(write_w_list)
                 write = array_ops.pack(write_list)
@@ -301,7 +298,7 @@ class NTMCell(object):
             for idx in xrange(self.read_head_size):
                 read_w_idx = Linear(dummy, self.mem_size, is_range=True, 
                                     name='read_w_%d' % idx)
-                read_w_init_list.append(tf.nn.softmax(read_w_idx))
+                read_w_init_list.append(softmax(read_w_idx))
 
                 read_init_idx = Linear(dummy, self.mem_dim,
                                        squeeze=True, name='read_init_%d' % idx)
@@ -316,7 +313,7 @@ class NTMCell(object):
             for idx in xrange(self.write_head_size):
                 write_w_idx = Linear(dummy, self.mem_size, is_range=True,
                                      name='write_w_%s' % idx)
-                write_w_init_list.append(tf.nn.softmax(write_w_idx))
+                write_w_init_list.append(softmax(write_w_idx))
 
             write_w_init = tf.reshape(array_ops.pack(write_w_init_list),
                                       [self.write_head_size, -1])
