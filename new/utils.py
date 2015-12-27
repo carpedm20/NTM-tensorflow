@@ -1,3 +1,5 @@
+import numpy as np
+
 try:
     xrange
 except NameError:

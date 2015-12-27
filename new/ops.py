@@ -10,7 +10,10 @@ def Linear(inputs, output_size, stddev=0.5,
         total_input_size = 0
         if type(inputs) != list:
             inputs = [inputs]
-        shapes = [a.get_shape().as_list() for a in inputs]
+        try:
+            shapes = [input_.get_shape().as_list() for input_ in inputs]
+        except:
+            shapes = [input_.shape for input_ in inputs]
 
         for shape in shapes:
             if len(shape) != 2:
