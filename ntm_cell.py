@@ -100,6 +100,7 @@ class NTMCell(object):
 
     # Build LSTM controller
     def build_controller(self, input_, read_prev, output_prev, hidden_prev):
+        #print(input_.shape, read_prev.get_shape(), output_prev.get_shape(), hidden_prev.get_shape())
         with tf.variable_scope("controller"):
             output_list = []
             hidden_list = []
@@ -156,8 +157,11 @@ class NTMCell(object):
                 update = tf.tanh(new_gate('update'))
 
                 # update the sate of the LSTM cell
-                hidden_list.append(tf.add_n([f * h_prev, i * update]))
-                output_list.append(o * tf.tanh(hidden_list[-1]))
+                hid = tf.add_n([f * h_prev, i * update])
+                out = o * tf.tanh(hid)
+
+                hidden_list.append(hid)
+                output_list.append(out)
 
             output = array_ops.pack(output_list)
             hidden = array_ops.pack(hidden_list)
@@ -311,6 +315,8 @@ class NTMCell(object):
             read_w_init = tf.reshape(array_ops.pack(read_w_init_list),
                                      [self.read_head_size, -1])
             read_init = array_ops.pack(read_init_list)
+            if self.read_head_size == 1:
+                read_init = tf.squeeze(read_init)
 
             # write weights
             write_w_init_list = []
@@ -342,7 +348,7 @@ class NTMCell(object):
                 'M': M_init,
                 'read_w': read_w_init,
                 'write_w': write_w_init,
-                'read': tf.reshape(read_init, [self.read_head_size, self.mem_dim]),
+                'read': read_init,
                 'output': output_init,
                 'hidden': hidden_init
             }
