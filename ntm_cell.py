@@ -14,9 +14,8 @@ from ops import *
 class NTMCell(object):
     def __init__(self, input_dim, output_dim,
                  mem_size=128, mem_dim=20, controller_dim=100,
-                 controller_layer_size=2, shift_range=1,
-                 write_head_size=2, read_head_size=2,
-                 lr_rate=1e-4):
+                 controller_layer_size=3, shift_range=1,
+                 write_head_size=1, read_head_size=1):
         """Initialize the parameters for an NTM cell.
         Args:
             input_dim: int, The number of units in the LSTM cell
@@ -36,24 +35,9 @@ class NTMCell(object):
         self.shift_range = shift_range
         self.write_head_size = write_head_size
         self.read_head_size = read_head_size
-        self.current_lr = lr_rate
 
         self.depth = 0
-        self.input_cells = []
-        self.output_cells = []
-        self.prev_outputs = []
-
-        self.min_grad = -10
-        self.max_grad = +10
-
-        # training options
-        self.lr = tf.Variable(self.current_lr)
-        self.opt = tf.train.GradientDescentOptimizer(self.lr)
-
-        self.global_step = tf.Variable(0, name="global_step")
-        inc = self.global_step.assign_add(1)
-
-        self.saver = tf.train.Saver()
+        self.states = []
 
     def __call__(self, input_, state, scope=None):
         """Run one step of NTM.
@@ -82,17 +66,18 @@ class NTMCell(object):
         hidden_prev = state['hidden']
 
         # build a controller
-        output, hidden = self.build_controller(input_, read_prev, output_prev, hidden_prev)
+        output, hidden = self.build_controller(input_, read_prev, output_prev,
+                                               hidden_prev)
 
         # last output layer from LSTM controller
-        last_output = output if self.controller_layer_size == 1 \
-                             else tf.gather(output, self.controller_layer_size - 1)
+        last_output = gather(output, self.controller_layer_size - 1)
 
         # build a memory
-        M, read_w, write_w, read = self.build_memory(M_prev, read_w_prev, write_w_prev, last_output)
+        M, read_w, write_w, read = self.build_memory(M_prev, read_w_prev, write_w_prev,
+                                                     last_output)
 
         # get a new output
-        output = self.new_output(last_output)
+        new_output = self.new_output(last_output)
 
         state = {
             'M': M,
@@ -102,27 +87,34 @@ class NTMCell(object):
             'output': output,
             'hidden': hidden,
         }
-        return output, state
 
+        self.depth += 1
+        self.states.append(state)
+
+        return new_output, state
+
+    # Logistic sigmoid output layers 
     def new_output(self, output):
         with tf.variable_scope('output'):
             return tf.sigmoid(Linear(output, self.output_dim, name='output'))
 
-    # Build a LSTM controller
+    # Build LSTM controller
     def build_controller(self, input_, read_prev, output_prev, hidden_prev):
         with tf.variable_scope("controller"):
             output_list = []
             hidden_list = []
             for layer_idx in xrange(self.controller_layer_size):
-                if self.controller_layer_size == 1:
-                    o_prev = output_prev
-                    h_prev = hidden_prev
-                else:
-                    o_prev = tf.gather(output_prev, layer_idx)
-                    h_prev = tf.gather(hidden_prev, layer_idx)
+                o_prev = gather(output_prev, layer_idx)
+                h_prev = gather(hidden_prev, layer_idx)
 
                 if layer_idx == 0:
                     def new_gate(gate_name):
+                        return linear([input_, o_prev] + \
+                                      [gather(read_prev, read_idx) for read_idx in xrange(self.read_head_size)],
+                                      output_size = self.controller_dim,
+                                      bias = True,
+                                      scope = "%s_gate_%s" % (gate_name, layer_idx))
+
                         in_modules = [
                             Linear(input_, self.controller_dim,
                                    name='%s_gate_1_%s' % (gate_name, layer_idx)),
@@ -132,20 +124,26 @@ class NTMCell(object):
                         if self.read_head_size == 1:
                             in_modules.append(
                                 Linear(read_prev, self.controller_dim,
-                                       name='%s_gate_3_%s' % (gate_name, layer_idx))
+                                       squeeze=True, name='%s_gate_3_%s' % (gate_name, layer_idx))
                             )
                         else:
                             for read_idx in xrange(self.read_head_size):
-                                vec = tf.gather(read_prev, read_idx)
+                                vec = gather(read_prev, read_idx)
                                 in_modules.append(
                                     Linear(vec, self.controller_dim,
-                                           name='%s_gate_3_%s_%s' % (gate_name, layer_idx, read_idx))
+                                           name='%s_gate_3_%s_%s' \
+                                                    % (gate_name, layer_idx, read_idx))
                                 )
                         return tf.add_n(in_modules)
                 else:
                     def new_gate(gate_name):
+                        return linear([output_list[-1], o_prev],
+                                      output_size = self.controller_dim,
+                                      bias = True,
+                                      scope="%s_gate_%s" % (gate_name, layer_idx))
+
                         return tf.add_n([
-                            Linear(output_list[layer_idx-1], self.controller_dim,
+                            Linear(output_list[-1], self.controller_dim,
                                    name='%s_gate_1_%s' % (gate_name, layer_idx)),
                             Linear(o_prev, self.controller_dim,
                                    name='%s_gate_2_%s' % (gate_name, layer_idx)),
@@ -159,7 +157,7 @@ class NTMCell(object):
 
                 # update the sate of the LSTM cell
                 hidden_list.append(tf.add_n([f * h_prev, i * update]))
-                output_list.append(o * tf.tanh(hidden_list[layer_idx]))
+                output_list.append(o * tf.tanh(hidden_list[-1]))
 
             output = array_ops.pack(output_list)
             hidden = array_ops.pack(hidden_list)
@@ -173,7 +171,7 @@ class NTMCell(object):
         return self.build_head(M_prev, write_w_prev, last_output, False, idx)
 
     def build_head(self, M_prev, w_prev, last_output, is_read, idx):
-        scope = 'read' if is_read else 'write'
+        scope = "read" if is_read else "write"
 
         with tf.variable_scope(scope):
             # Figure 2.
@@ -190,7 +188,8 @@ class NTMCell(object):
             with tf.variable_scope("beta"):
                 beta  = tf.nn.softplus(Linear(last_output, 1, name='beta_%s' % idx))
             with tf.variable_scope("gamma"):
-                gamma = tf.add(tf.nn.softplus(Linear(last_output, 1, name='gamma_%s' % idx)), tf.constant(1.0))
+                gamma = tf.add(tf.nn.softplus(Linear(last_output, 1, name='gamma_%s' % idx)),
+                               tf.constant(1.0))
 
             # 3.3.1
             # Cosine similarity
@@ -214,11 +213,11 @@ class NTMCell(object):
 
             if is_read:
                 # 3.1 Reading
-                read = tf.transpose(tf.transpose(M_prev) * w)
+                read = matmul(tf.transpose(M_prev), w)
                 return w, read
             else:
                 # 3.2 Writing
-                erase = tf.sigmoid(Linear(last_output, self.mem_dim, name='erase_%s' % idx)) # [1 x mem_dim]
+                erase = tf.sigmoid(Linear(last_output, self.mem_dim, name='erase_%s' % idx))
                 add = tf.tanh(Linear(last_output, self.mem_dim, name='add_%s' % idx))
                 return w, add, erase
 
@@ -227,13 +226,13 @@ class NTMCell(object):
         with tf.variable_scope("memory"):
             # 3.1 Reading
             if self.read_head_size == 1:
-                read_w, read = self.build_read_head(M_prev, read_w_prev, last_output, 0)
+                read_w, read = self.build_read_head(M_prev, tf.squeeze(read_w_prev), last_output, 0)
             else:
                 read_w_list = []
                 read_list = []
 
                 for idx in xrange(self.read_head_size):
-                    read_w_prev_idx = tf.gather(read_w_prev, idx)
+                    read_w_prev_idx = gather(read_w_prev, idx)
                     read_w_idx, read_idx = self.build_read_head(M_prev, read_w_prev_idx,
                                                                 last_output, idx)
 
@@ -245,11 +244,13 @@ class NTMCell(object):
 
             # 3.2 Writing
             if self.write_head_size == 1:
-                write_w, write, erase = self.build_write_head(M_prev, write_w_prev,
+                write_w, write, erase = self.build_write_head(M_prev,
+                                                              tf.squeeze(write_w_prev),
                                                               last_output, 0)
 
-                M_erase = tf.ones([self.mem_size, self.mem_dim]) - outer_product(write_w, erase)
-                M_write = outer_prod(write_w, write)
+                M_erase = tf.ones([self.mem_size, self.mem_dim]) \
+                              - outer_product(write_w, erase)
+                M_write = outer_product(write_w, write)
             else:
                 write_w_list = []
                 write_list = []
@@ -259,7 +260,7 @@ class NTMCell(object):
                 M_writes = []
 
                 for idx in xrange(self.write_head_size):
-                    write_w_prev_idx = tf.gather(write_w_prev, idx)
+                    write_w_prev_idx = gather(write_w_prev, idx)
 
                     write_w_idx, write_idx, erase_idx = \
                         self.build_write_head(M_prev, write_w_prev_idx, last_output, idx)
@@ -268,7 +269,8 @@ class NTMCell(object):
                     write_list.append(write_idx)
                     erase_list.append(erase_idx)
 
-                    M_erases.append(tf.ones([self.mem_size, self.mem_dim]) * outer_product(write_w_idx, erase_idx))
+                    M_erases.append(tf.ones([self.mem_size, self.mem_dim]) \
+                                    * outer_product(write_w_idx, erase_idx))
                     M_writes.append(outer_product(write_w_idx, write_idx))
 
                 write_w = array_ops.pack(write_w_list)
@@ -283,6 +285,8 @@ class NTMCell(object):
             return M, read_w, write_w, read
 
     def initial_state(self, dummy_value=0.0):
+        self.depth = 0
+        self.states = []
         with tf.variable_scope("init_cell"):
             # always zero
             dummy = tf.Variable(tf.constant([[dummy_value]], dtype=tf.float32))
@@ -342,120 +346,27 @@ class NTMCell(object):
                 'output': output_init,
                 'hidden': hidden_init
             }
+
+            self.depth += 1
+            self.states.append(state)
+
             return output, state
 
-    def build_model(self):
-        self.init_input_cell, self.init_output_cell = self.build_init_cell()
-
-        with tf.variable_scope("cell") as scope:
-            self.cell_scope = scope
-            self.master_input_cell, self.master_output_cell = self.build_cell()
-
-        print(" [*] Initialization start...")
-        self.sess.run(tf.initialize_all_variables())
-        print(" [*] Initialization end")
-
-    def add_new_cell(self):
-        try:
-            cur_input_cell = self.input_cells[self.depth]
-            cur_output_cell = self.output_cells[self.depth]
-        except:
-            with tf.variable_scope(self.cell_scope, reuse=True):
-                cur_input_cell, cur_output_cell = self.build_cell()
-                self.sess.run(tf.initialize_all_variables())
-                self.input_cells.append(cur_input_cell)
-                self.output_cells.append(cur_output_cell)
-
-        return cur_input_cell, cur_output_cell
-
-    def backward(self, true_output):
-        cur_input_cell = self.master_input_cell
-        cur_output_cell = self.master_output_cell
-        #cur_input_cell, cur_output_cell = self.add_new_cell()
-
-        outputs = self.sess.run([
-                cur_output_cell['new_output'],
-                cur_output_cell['M'], cur_output_cell['read_w'], cur_output_cell['write_w'],
-                cur_output_cell['read'], cur_output_cell['output'], cur_output_cell['hidden'],
-            ], feed_dict = {
-                cur_input_cell['input']: input,
-                cur_input_cell['M_prev']: prev_outputs[1],
-                cur_input_cell['read_w_prev']: prev_outputs[2],
-                cur_input_cell['write_w_prev']: prev_outputs[3],
-                cur_input_cell['read_prev']: prev_outputs[4],
-                cur_input_cell['output_prev']: prev_outputs[5],
-                cur_input_cell['hidden_prev']: prev_outputs[6],
-            }
-        )
-        
-        return loss
-
-    def forward(self, input):
-        if self.depth == 0:
-            prev_outputs = self.sess.run([
-                    self.init_output_cell['new_output'],
-                    self.init_output_cell['M'], self.init_output_cell['read_w'],
-                    self.init_output_cell['write_w'], self.init_output_cell['read'],
-                    self.init_output_cell['output'], self.init_output_cell['hidden']
-                ], feed_dict={
-                    self.init_input_cell['input']: [[0.0]]
-                }
-            )
-            self.initial_values = prev_outputs
-        else:
-            prev_outputs = self.prev_outputs[self.depth - 1]
-
-        cur_input_cell = self.master_input_cell
-        cur_output_cell = self.master_output_cell
-        #cur_input_cell, cur_output_cell = self.add_new_cell()
-
-        outputs = self.sess.run([
-                cur_output_cell['new_output'],
-                cur_output_cell['M'], cur_output_cell['read_w'], cur_output_cell['write_w'],
-                cur_output_cell['read'], cur_output_cell['output'], cur_output_cell['hidden'],
-            ], feed_dict = {
-                cur_input_cell['input']: input,
-                cur_input_cell['M_prev']: prev_outputs[1],
-                cur_input_cell['read_w_prev']: prev_outputs[2],
-                cur_input_cell['write_w_prev']: prev_outputs[3],
-                cur_input_cell['read_prev']: prev_outputs[4],
-                cur_input_cell['output_prev']: prev_outputs[5],
-                cur_input_cell['hidden_prev']: prev_outputs[6],
-            }
-        )
-        outputs[2] = outputs[2].T
-        outputs[3] = outputs[3].T
-        outputs[4] = outputs[4].T
-        self.output = outputs[0]
-        self.prev_outputs.append(outputs)
-
-        self.depth += 1
-        
-        return self.output
-
     def get_memory(self, depth=None):
-        if self.depth == 0:
-            return prev_outputs[1]
         depth = depth if depth else self.depth
-        return self.prev_outputs[depth - 1][1]
+        return self.states[depth - 1]['M']
 
     def get_read_weights(self, depth=None):
-        if self.depth == 0:
-            return prev_outputs[2]
         depth = depth if depth else self.depth
-        return self.prev_outputs[depth - 1][2]
+        return self.states[depth - 1]['read_w']
 
     def get_write_weights(self, depth=None):
-        if self.depth == 0:
-            return prev_outputs[3]
         depth = depth if depth else self.depth
-        return self.prev_outputs[depth - 1][3]
+        return self.states[depth - 1]['write_w']
 
     def get_read_vector(self, depth=None):
-        if self.depth == 0:
-            return prev_outputs[4]
         depth = depth if depth else self.depth
-        return self.prev_outputs[depth - 1][4]
+        return self.states[depth - 1]['read']
 
     def print_read_max(self):
         read_w = self.get_read_weights()
@@ -475,4 +386,4 @@ class NTMCell(object):
             print(fmt % (argmax(write_w[0])))
         else:
             for idx in xrange(self.write_head_size):
-                print(fmt % np.argmax(write_w[idx]))
+                print(fmt % argmax(gather(write_w, idx)))

@@ -1,5 +1,3 @@
-import tensorflow as tf
-
 try:
     xrange
 except NameError:
@@ -13,9 +11,3 @@ def argmax(x):
             index = idx
             max_num = x[idx]
     return index, max_num
-
-def softmax(x):
-    try:
-        return tf.nn.softmax(x)
-    except:
-        return tf.reshape(tf.nn.softmax(tf.reshape(x, [1, -1])), [-1])

@@ -1,7 +1,16 @@
+import tensorflow as tf
+
 try:
     xrange
 except NameError:
     xrange = range
+
+def gather(m_or_v, idx):
+    if len(m_or_v.get_shape()) > 1:
+        return tf.gather(m_or_v, idx)
+    else:
+        assert idx == 0, "Error: idx should be 0 but %d" % idx
+        return m_or_v
 
 def argmax(x):
     index = 0
@@ -11,3 +20,26 @@ def argmax(x):
             index = idx
             max_num = x[idx]
     return index, max_num
+
+def softmax(x):
+    """Compute softmax.
+
+    Args:
+        x: a 2-D `Tensor` (matrix) or 1-D `Tensor` (vector)
+    """
+    try:
+        return tf.nn.softmax(x)
+    except:
+        return tf.reshape(tf.nn.softmax(tf.reshape(x, [1, -1])), [-1])
+
+def matmul(x, y):
+    """Compute matrix multiplication.
+
+    Args:
+        x: a 2-D `Tensor` (matrix)
+        y: a 2-D `Tensor` (matrix) or 1-D `Tensor` (vector)
+    """
+    try:
+        return tf.matmul(x, y)
+    except:
+        return tf.reshape(tf.matmul(x, tf.reshape(y, [-1, 1])), [-1])
