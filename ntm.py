@@ -64,7 +64,7 @@ class NTM(object):
                                              momentum=self.momentum)
         self.build_model()
 
-    def build_model(self):
+    def build_model(self, forward_only=False):
         print(" [*] Build a NTM model")
 
         with tf.variable_scope(self.scope):
@@ -92,34 +92,35 @@ class NTM(object):
                     output, state = self.cell(zeros, state)
                     self.outputs.append(output)
 
-            for seq_length in xrange(self.min_length, self.max_length + 1):
-                print(" [*] Build a loss model for seq_length %s" % seq_length)
+            if not forward_only:
+                for seq_length in xrange(self.min_length, self.max_length + 1):
+                    print(" [*] Build a loss model for seq_length %s" % seq_length)
 
-                loss = sequence_loss(logits=self.outputs[0:seq_length],
-                                     targets=self.true_outputs[0:seq_length],
-                                     weights=[1] * seq_length,
-                                     num_decoder_symbols=-1, # trash
-                                     average_across_timesteps=False,
-                                     average_across_batch=False,
-                                     softmax_loss_function=\
-                                         binary_cross_entropy_with_logits)
+                    loss = sequence_loss(logits=self.outputs[0:seq_length],
+                                        targets=self.true_outputs[0:seq_length],
+                                        weights=[1] * seq_length,
+                                        num_decoder_symbols=-1, # trash
+                                        average_across_timesteps=False,
+                                        average_across_batch=False,
+                                        softmax_loss_function=\
+                                            binary_cross_entropy_with_logits)
 
-                if not self.params:
-                    self.params = tf.trainable_variables()
+                    if not self.params:
+                        self.params = tf.trainable_variables()
 
-                #grads, norm = tf.clip_by_global_norm(tf.gradients(loss, self.params), 5)
+                    #grads, norm = tf.clip_by_global_norm(tf.gradients(loss, self.params), 5)
 
-                grads = []
-                for grad in tf.gradients(loss, self.params):
-                    if grad:
-                        grads.append(tf.clip_by_value(grad, self.min_grad, self.max_grad))
-                    else:
-                        grads.append(grad)
+                    grads = []
+                    for grad in tf.gradients(loss, self.params):
+                        if grad:
+                            grads.append(tf.clip_by_value(grad, self.min_grad, self.max_grad))
+                        else:
+                            grads.append(grad)
 
-                self.grads[seq_length] = grads
-                self.losses[seq_length] = loss 
-                self.optims[seq_length] = self.opt.apply_gradients(zip(grads, self.params),
-                                                                   global_step=self.global_step)
+                    self.grads[seq_length] = grads
+                    self.losses[seq_length] = loss 
+                    self.optims[seq_length] = self.opt.apply_gradients(zip(grads, self.params),
+                                                                    global_step=self.global_step)
 
         self.saver = tf.train.Saver()
 
@@ -132,3 +133,11 @@ class NTM(object):
     @property
     def optim(self):
         return self.optims[self.cell.depth]
+
+    def load(self, checkpoint_dir):
+        print(" [*] Reading checkpoints...")
+        ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
+        if ckpt and ckpt.model_checkpoint_path:
+            self.saver.restore(self.sess, ckpt.model_checkpoint_path)
+        else:
+            raise Exception(" [!] Trest mode but no checkpoint found")

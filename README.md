@@ -17,7 +17,13 @@ Prerequisites
 Usage
 -----
 
-in progress
+For the copy task:
+
+    $ python main.py --task copy
+
+For the recall task:
+
+    $ python main.py --task recall
 
 
 Author

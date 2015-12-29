@@ -7,8 +7,25 @@ from random import randint
 from ntm import NTM
 from ntm_cell import NTMCell
 
-def copy(ntm, seq_length):
+epoch = 10000
+print_interval = 10
+
+input_dim = 10
+output_dim = 10
+
+min_length = 1
+max_length = 10
+
+checkpoint_dir = './checkpoint'
+
+def copy(seq_length):
     with tf.device('/cpu:0'), tf.Session() as sess:
+        with tf.variable_scope("NTM") as scope:
+            cell = NTMCell(input_dim=input_dim, output_dim=output_dim)
+            ntm = NTM(cell, sess, min_length, max_length, scope=scope)
+
+        ntm.load(checkpoint_dir)
+
         start_symbol = np.zeros([ntm.cell.input_dim], dtype=np.float32)
         start_symbol[0] = 1
         end_symbol = np.zeros([ntm.cell.input_dim], dtype=np.float32)
@@ -25,26 +42,16 @@ def copy(ntm, seq_length):
             ntm.end_symbol: end_symbol
         })
 
-        outputs = sess.run(ntm.outputs + ntm.losses[seq_length], feed_dict=feed_dict)
+        result = sess.run(ntm.outputs + [ntm.losses[seq_length]], feed_dict=feed_dict)
 
-        outputs = outputs[:-1]
-        loss = outputs[-1]
+        outputs = result[0]
+        loss = result[1]
 
         print(" true output : %s" % seq)
         print(" predicted output : %s" % outputs)
         print(" Loss : %f" % loss)
 
 def copy_train():
-    epoch = 10000
-    print_interval = 10
-
-    input_dim = 10
-    output_dim = 10
-    min_length = 5
-    max_length = 5
-    #max_length = 20
-
-    checkpoint_dir = './checkpoint'
     if not os.path.isdir(checkpoint_dir):
         raise Exception(" [!] Directory %s not found" % checkpoint_dir)
 
@@ -80,9 +87,9 @@ def copy_train():
                                       ntm.global_step], feed_dict=feed_dict)
 
             if idx % 100 == 0:
-                ntm.saver.save(self.sess,
+                ntm.saver.save(sess,
                                os.path.join(checkpoint_dir, "NTM.model"),
-                               global_step = ntm.step.astype(int))
+                               global_step = step.astype(int))
 
             if idx % print_interval == 0:
                 print("[%4d] %d: %.2f (%.1fs)" % (idx, seq_length, cost, time.time() - start_time))

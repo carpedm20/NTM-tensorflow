@@ -35,23 +35,18 @@ def linear(args, output_size, bias, bias_start=0.0, scope=None):
     shapes = []
     for a in args:
         try:
-            if len(a.get_shape().as_list()) == 0:
-                import ipdb; ipdb.set_trace() 
             shapes.append(a.get_shape().as_list())
         except Exception as e:
             shapes.append(a.shape)
 
     is_vector = False
     for idx, shape in enumerate(shapes):
-        try:
-            if len(shape) != 2:
-                is_vector = True
-                args[idx] = tf.reshape(args[idx], [1, -1])
-                total_arg_size += shape[0]
-            else:
-                total_arg_size += shape[1]
-        except:
-            import ipdb; ipdb.set_trace() 
+        if len(shape) != 2:
+            is_vector = True
+            args[idx] = tf.reshape(args[idx], [1, -1])
+            total_arg_size += shape[0]
+        else:
+            total_arg_size += shape[1]
 
     # Now the computation.
     with vs.variable_scope(scope or "Linear"):
