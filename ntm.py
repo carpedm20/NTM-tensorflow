@@ -11,9 +11,11 @@ import ntm_cell
 from ops import binary_cross_entropy_with_logits
 
 class NTM(object):
-    def __init__(self, cell, 
-                 min_grad=-10, max_grad=+10, 
-                 lr=1e-4, scope="NTM"):
+    def __init__(self, cell, sess,
+                 min_length, max_length,
+                 min_grad=-100, max_grad=+100, 
+                 lr=1e-4, momentum=0.9, decay=0.95,
+                 scope="NTM"):
         """Create a neural turing machine specified by NTMCell "cell".
 
         Args:
@@ -21,74 +23,104 @@ class NTM(object):
             min_grad: (optional) Minimum gradient for gradient clipping [-10].
             max_grad: (optional) Maximum gradient for gradient clipping [+10].
             lr: (optional) Learning rate [1e-4].
-            scope: VariableScope for the created subgraph ["NTM"].
+            momentum: (optional) Momentum of RMSProp [0.9].
+            decay: (optional) Decay rate of RMSProp [0.95].
         """
         if not isinstance(cell, ntm_cell.NTMCell):
             raise TypeError("cell must be an instance of NTMCell")
+
         self.cell = cell
+        self.sess = sess
         self.scope = scope
-        self.reuse = False
+
+        self.lr = lr
+        self.momentum = momentum
+        self.decay = decay
 
         self.min_grad = min_grad
-        self.max_grad = min_grad
-        self.current_lr = lr
-        self.lr = tf.Variable(self.current_lr, trainable=False)
-        
+        self.max_grad = max_grad
+        self.min_length = min_length
+        self.max_length = max_length
+
+        self.inputs = []
+        self.outputs = []
+        self.true_outputs = []
+        self.start_symbol = tf.placeholder(tf.float32, [self.cell.input_dim])
+        self.end_symbol = tf.placeholder(tf.float32, [self.cell.input_dim])
+
         self.losses = {}
         self.optims = {}
-	self.saver = tf.train.Saver()
+        self.grads = {}
 
-    def forward(self, inputs, logging=False):
-        if not inputs:
-            raise ValueError("inputs must not be empty")
+        self.saver = None
+        self.params = None
+
+        self.global_step = tf.Variable(0, trainable=False)
+        self.opt = tf.train.RMSPropOptimizer(self.lr,
+                                             decay=self.decay,
+                                             momentum=self.momentum)
+        self.build_model()
+
+    def build_model(self):
+        print(" [*] Build a NTM model")
 
         with tf.variable_scope(self.scope):
-            if self.reuse:
-                tf.get_variable_scope().reuse_variables()
+            # present start symbol
+            _, prev_state = self.cell(self.start_symbol, state=None)
+            zeros = np.zeros(self.cell.input_dim, dtype=np.float32)
 
-            output, state = self.cell.initial_state()
+            tf.get_variable_scope().reuse_variables()
+            for seq_length in xrange(1, self.max_length + 1):
+                input_ = tf.placeholder(tf.float32, [self.cell.input_dim])
+                output = tf.placeholder(tf.float32, [self.cell.output_dim])
 
-            # write head max
-            for time, input_ in enumerate(inputs):
-                if not self.reuse and time > 0:
-                    tf.get_variable_scope().reuse_variables()
-                _, state = self.cell(input_, state)
+                self.inputs.append(input_)
+                self.true_outputs.append(output)
 
-            # read head max
-            loss = 0
-            input_dim = inputs[0].shape[0]
-            zeros = np.zeros(input_dim, dtype=np.float32)
+                # present inputs
+                _, prev_state = self.cell(input_, prev_state)
 
-            self.outputs = []
-            for _ in inputs:
-                output, state = self.cell(zeros, state)
-                self.outputs.append(output)
+                # present end symbol
+                _, state = self.cell(self.end_symbol, prev_state)
 
-            if not self.losses.has_key(self.cell.depth):
-                loss = sequence_loss(logits = self.outputs,
-                                     targets = inputs,
-                                     weights = [tf.ones([input_dim])] * len(inputs),
-                                     num_decoder_symbols = -1, # trash
-                                     average_across_timesteps = True,
-                                     average_across_batch = False,
-                                     softmax_loss_function = \
+                # present targets
+                self.outputs = []
+                for _ in xrange(seq_length):
+                    output, state = self.cell(zeros, state)
+                    self.outputs.append(output)
+
+            for seq_length in xrange(self.min_length, self.max_length + 1):
+                print(" [*] Build a loss model for seq_length %s" % seq_length)
+
+                loss = sequence_loss(logits=self.outputs[0:seq_length],
+                                     targets=self.true_outputs[0:seq_length],
+                                     weights=[1] * seq_length,
+                                     num_decoder_symbols=-1, # trash
+                                     average_across_timesteps=False,
+                                     average_across_batch=False,
+                                     softmax_loss_function=\
                                          binary_cross_entropy_with_logits)
 
-                tvars = tf.trainable_variables()
-                grads, _ = tf.clip_by_global_norm(tf.gradients(loss, tvars), 5)
-                #grads = [tf.clip_by_value(grad, self.min_grad, self.max_grad) \
-                #             for grad in tf.gradients(loss, tvars)]
-                optimizer = tf.train.GradientDescentOptimizer(self.lr)
+                if not self.params:
+                    self.params = tf.trainable_variables()
 
-                self.losses[self.cell.depth] = loss 
-                self.optims[self.cell.depth] = optimizer.apply_gradients(zip(grads, tvars))
+                #grads, norm = tf.clip_by_global_norm(tf.gradients(loss, self.params), 5)
 
-            self.reuse = True
+                grads = []
+                for grad in tf.gradients(loss, self.params):
+                    if grad:
+                        grads.append(tf.clip_by_value(grad, self.min_grad, self.max_grad))
+                    else:
+                        grads.append(grad)
 
-        return self.outputs, loss
+                self.grads[seq_length] = grads
+                self.losses[seq_length] = loss 
+                self.optims[seq_length] = self.opt.apply_gradients(zip(grads, self.params),
+                                                                   global_step=self.global_step)
 
-    def print_write_max(self):
-        cell.print_write_max()
+        self.saver = tf.train.Saver()
+
+        print(" [*] Build a NTM model finished")
 
     @property
     def loss(self):

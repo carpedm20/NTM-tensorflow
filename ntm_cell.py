@@ -14,7 +14,7 @@ from ops import *
 class NTMCell(object):
     def __init__(self, input_dim, output_dim,
                  mem_size=128, mem_dim=20, controller_dim=100,
-                 controller_layer_size=3, shift_range=1,
+                 controller_layer_size=1, shift_range=1,
                  write_head_size=1, read_head_size=1):
         """Initialize the parameters for an NTM cell.
         Args:
@@ -39,7 +39,7 @@ class NTMCell(object):
         self.depth = 0
         self.states = []
 
-    def __call__(self, input_, state, scope=None):
+    def __call__(self, input_, state=None, scope=None):
         """Run one step of NTM.
 
         Args:
@@ -58,19 +58,22 @@ class NTMCell(object):
             - A 2D, batch x state_size, Tensor representing the new state of LSTM
                 after reading "input_" when previous state was "state".
         """
+        if state == None:
+            _, state = self.initial_state()
+
         M_prev = state['M']
         read_w_prev = state['read_w']
         write_w_prev = state['write_w']
         read_prev = state['read']
-        output_prev = state['output']
-        hidden_prev = state['hidden']
+        output_list_prev = state['output']
+        hidden_list_prev = state['hidden']
 
         # build a controller
-        output, hidden = self.build_controller(input_, read_prev, output_prev,
-                                               hidden_prev)
+        output_list, hidden_list = self.build_controller(input_, read_prev, output_list_prev,
+                                                         hidden_list_prev)
 
         # last output layer from LSTM controller
-        last_output = gather(output, self.controller_layer_size - 1)
+        last_output = output_list[-1]
 
         # build a memory
         M, read_w, write_w, read = self.build_memory(M_prev, read_w_prev, write_w_prev,
@@ -84,8 +87,8 @@ class NTMCell(object):
             'read_w': read_w,
             'write_w': write_w,
             'read': read,
-            'output': output,
-            'hidden': hidden,
+            'output': output_list,
+            'hidden': hidden_list,
         }
 
         self.depth += 1
@@ -99,14 +102,13 @@ class NTMCell(object):
             return tf.sigmoid(Linear(output, self.output_dim, name='output'))
 
     # Build LSTM controller
-    def build_controller(self, input_, read_prev, output_prev, hidden_prev):
-        #print(input_.shape, read_prev.get_shape(), output_prev.get_shape(), hidden_prev.get_shape())
+    def build_controller(self, input_, read_prev, output_list_prev, hidden_list_prev):
         with tf.variable_scope("controller"):
             output_list = []
             hidden_list = []
             for layer_idx in xrange(self.controller_layer_size):
-                o_prev = gather(output_prev, layer_idx)
-                h_prev = gather(hidden_prev, layer_idx)
+                o_prev = output_list_prev[layer_idx]
+                h_prev = hidden_list_prev[layer_idx]
 
                 if layer_idx == 0:
                     def new_gate(gate_name):
@@ -163,10 +165,70 @@ class NTMCell(object):
                 hidden_list.append(hid)
                 output_list.append(out)
 
-            output = array_ops.pack(output_list)
-            hidden = array_ops.pack(hidden_list)
+            return output_list, hidden_list
 
-            return output, hidden
+    # build a memory to read & write
+    def build_memory(self, M_prev, read_w_prev, write_w_prev, last_output):
+        with tf.variable_scope("memory"):
+            # 3.1 Reading
+            if self.read_head_size == 1:
+                read_w, read = self.build_read_head(M_prev, tf.squeeze(read_w_prev), last_output, 0)
+            else:
+                read_w_list = []
+                read_list = []
+
+                for idx in xrange(self.read_head_size):
+                    read_w_prev_idx = gather(read_w_prev, idx)
+                    read_w_idx, read_idx = self.build_read_head(M_prev, read_w_prev_idx,
+                                                                last_output, idx)
+
+                    read_w_list.append(read_w_idx)
+                    read_list.append(read_idx)
+
+                read_w = tf.pack(read_w_list)
+                read = tf.pack(read_list)
+
+            # 3.2 Writing
+            if self.write_head_size == 1:
+                write_w, write, erase = self.build_write_head(M_prev,
+                                                              tf.squeeze(write_w_prev),
+                                                              last_output, 0)
+
+                M_erase = tf.ones([self.mem_size, self.mem_dim]) \
+                              - outer_product(write_w, erase)
+                M_write = outer_product(write_w, write)
+            else:
+                write_w_list = []
+                write_list = []
+                erase_list = []
+
+                M_erases = []
+                M_writes = []
+
+                for idx in xrange(self.write_head_size):
+                    write_w_prev_idx = gather(write_w_prev, idx)
+
+                    write_w_idx, write_idx, erase_idx = \
+                        self.build_write_head(M_prev, write_w_prev_idx, last_output, idx)
+
+                    write_w_list.append(tf.transpose(write_w_idx))
+                    write_list.append(write_idx)
+                    erase_list.append(erase_idx)
+
+                    M_erases.append(tf.ones([self.mem_size, self.mem_dim]) \
+                                    * outer_product(write_w_idx, erase_idx))
+                    M_writes.append(outer_product(write_w_idx, write_idx))
+
+                write_w = tf.pack(write_w_list)
+                write = tf.pack(write_list)
+                erase = tf.pack(erase_list)
+
+                M_erase = reduce(lambda x, y: x*y, M_erases)
+                M_write = tf.add_n(M_writes)
+
+            M = M_prev * M_erase + M_write
+
+            return M, read_w, write_w, read
 
     def build_read_head(self, M_prev, read_w_prev, last_output, idx):
         return self.build_head(M_prev, read_w_prev, last_output, True, idx)
@@ -225,69 +287,6 @@ class NTMCell(object):
                 add = tf.tanh(Linear(last_output, self.mem_dim, name='add_%s' % idx))
                 return w, add, erase
 
-    # build a memory to read & write
-    def build_memory(self, M_prev, read_w_prev, write_w_prev, last_output):
-        with tf.variable_scope("memory"):
-            # 3.1 Reading
-            if self.read_head_size == 1:
-                read_w, read = self.build_read_head(M_prev, tf.squeeze(read_w_prev), last_output, 0)
-            else:
-                read_w_list = []
-                read_list = []
-
-                for idx in xrange(self.read_head_size):
-                    read_w_prev_idx = gather(read_w_prev, idx)
-                    read_w_idx, read_idx = self.build_read_head(M_prev, read_w_prev_idx,
-                                                                last_output, idx)
-
-                    read_w_list.append(read_w_idx)
-                    read_list.append(read_idx)
-
-                read_w = array_ops.pack(read_w_list)
-                read = array_ops.pack(read_list)
-
-            # 3.2 Writing
-            if self.write_head_size == 1:
-                write_w, write, erase = self.build_write_head(M_prev,
-                                                              tf.squeeze(write_w_prev),
-                                                              last_output, 0)
-
-                M_erase = tf.ones([self.mem_size, self.mem_dim]) \
-                              - outer_product(write_w, erase)
-                M_write = outer_product(write_w, write)
-            else:
-                write_w_list = []
-                write_list = []
-                erase_list = []
-
-                M_erases = []
-                M_writes = []
-
-                for idx in xrange(self.write_head_size):
-                    write_w_prev_idx = gather(write_w_prev, idx)
-
-                    write_w_idx, write_idx, erase_idx = \
-                        self.build_write_head(M_prev, write_w_prev_idx, last_output, idx)
-
-                    write_w_list.append(tf.transpose(write_w_idx))
-                    write_list.append(write_idx)
-                    erase_list.append(erase_idx)
-
-                    M_erases.append(tf.ones([self.mem_size, self.mem_dim]) \
-                                    * outer_product(write_w_idx, erase_idx))
-                    M_writes.append(outer_product(write_w_idx, write_idx))
-
-                write_w = array_ops.pack(write_w_list)
-                write = array_ops.pack(write_list)
-                erase = array_ops.pack(erase_list)
-
-                M_erase = reduce(lambda x, y: x*y, M_erases)
-                M_write = tf.add_n(M_writes)
-
-            M = M_prev * M_erase + M_write
-
-            return M, read_w, write_w, read
-
     def initial_state(self, dummy_value=0.0):
         self.depth = 0
         self.states = []
@@ -312,9 +311,9 @@ class NTMCell(object):
                                        squeeze=True, name='read_init_%d' % idx)
                 read_init_list.append(tf.tanh(read_init_idx))
 
-            read_w_init = tf.reshape(array_ops.pack(read_w_init_list),
+            read_w_init = tf.reshape(tf.pack(read_w_init_list),
                                      [self.read_head_size, -1])
-            read_init = array_ops.pack(read_init_list)
+            read_init = tf.pack(read_init_list)
             if self.read_head_size == 1:
                 read_init = tf.squeeze(read_init)
 
@@ -325,7 +324,7 @@ class NTMCell(object):
                                      name='write_w_%s' % idx)
                 write_w_init_list.append(softmax(write_w_idx))
 
-            write_w_init = tf.reshape(array_ops.pack(write_w_init_list),
+            write_w_init = tf.reshape(tf.pack(write_w_init_list),
                                       [self.write_head_size, -1])
 
             # controller state
@@ -339,9 +338,6 @@ class NTMCell(object):
                                          squeeze=True, name='hidden_init_%s' % idx)
                 hidden_init_list.append(tf.tanh(hidden_init_idx))
 
-            output_init = array_ops.pack(output_init_list)
-            hidden_init = array_ops.pack(hidden_init_list)
-
             output = tf.tanh(Linear(dummy, self.output_dim, name='new_output'))
 
             state = {
@@ -349,8 +345,8 @@ class NTMCell(object):
                 'read_w': read_w_init,
                 'write_w': write_w_init,
                 'read': read_init,
-                'output': output_init,
-                'hidden': hidden_init
+                'output': output_init_list,
+                'hidden': hidden_init_list
             }
 
             self.depth += 1
@@ -374,8 +370,8 @@ class NTMCell(object):
         depth = depth if depth else self.depth
         return self.states[depth - 1]['read']
 
-    def print_read_max(self):
-        read_w = self.get_read_weights()
+    def print_read_max(self, sess):
+        read_w = sess.run(self.get_read_weights())
 
         fmt = "%-4d %.4f"
         if self.read_head_size == 1:
@@ -384,8 +380,8 @@ class NTMCell(object):
             for idx in xrange(self.read_head_size):
                 print(fmt % np.argmax(read_w[idx]))
 
-    def print_write_max(self):
-        write_w = self.get_write_weights()
+    def print_write_max(self, sess):
+        write_w = sess.run(self.get_write_weights())
 
         fmt = "%-4d %.4f"
         if self.write_head_size == 1:
