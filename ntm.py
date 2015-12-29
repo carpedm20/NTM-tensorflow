@@ -15,7 +15,7 @@ class NTM(object):
                  min_length, max_length,
                  min_grad=-100, max_grad=+100, 
                  lr=1e-4, momentum=0.9, decay=0.95,
-                 scope="NTM"):
+                 scope="NTM", forward_only=False):
         """Create a neural turing machine specified by NTMCell "cell".
 
         Args:
@@ -46,10 +46,12 @@ class NTM(object):
         self.max_length = max_length
 
         self.inputs = []
-        self.outputs = []
+        self.outputs = {}
         self.true_outputs = []
-        self.start_symbol = tf.placeholder(tf.float32, [self.cell.input_dim])
-        self.end_symbol = tf.placeholder(tf.float32, [self.cell.input_dim])
+        self.start_symbol = tf.placeholder(tf.float32, [self.cell.input_dim],
+                                           name='start_symbol')
+        self.end_symbol = tf.placeholder(tf.float32, [self.cell.input_dim],
+                                         name='end_symbol')
 
         self.losses = {}
         self.optims = {}
@@ -62,9 +64,9 @@ class NTM(object):
         self.opt = tf.train.RMSPropOptimizer(self.lr,
                                              decay=self.decay,
                                              momentum=self.momentum)
-        self.build_model()
+        self.build_model(forward_only)
 
-    def build_model(self, forward_only=False):
+    def build_model(self, forward_only):
         print(" [*] Build a NTM model")
 
         with tf.variable_scope(self.scope):
@@ -74,11 +76,13 @@ class NTM(object):
 
             tf.get_variable_scope().reuse_variables()
             for seq_length in xrange(1, self.max_length + 1):
-                input_ = tf.placeholder(tf.float32, [self.cell.input_dim])
-                output = tf.placeholder(tf.float32, [self.cell.output_dim])
+                input_ = tf.placeholder(tf.float32, [self.cell.input_dim],
+                                        name='input_%s' % seq_length)
+                true_output = tf.placeholder(tf.float32, [self.cell.output_dim],
+                                             name='true_output_%s' % seq_length)
 
                 self.inputs.append(input_)
-                self.true_outputs.append(output)
+                self.true_outputs.append(true_output)
 
                 # present inputs
                 _, prev_state = self.cell(input_, prev_state)
@@ -87,16 +91,18 @@ class NTM(object):
                 _, state = self.cell(self.end_symbol, prev_state)
 
                 # present targets
-                self.outputs = []
+                outputs = []
                 for _ in xrange(seq_length):
                     output, state = self.cell(zeros, state)
-                    self.outputs.append(output)
+                    outputs.append(output)
+
+                self.outputs[seq_length] = outputs
 
             if not forward_only:
                 for seq_length in xrange(self.min_length, self.max_length + 1):
                     print(" [*] Build a loss model for seq_length %s" % seq_length)
 
-                    loss = sequence_loss(logits=self.outputs[0:seq_length],
+                    loss = sequence_loss(logits=self.outputs[seq_length],
                                         targets=self.true_outputs[0:seq_length],
                                         weights=[1] * seq_length,
                                         num_decoder_symbols=-1, # trash

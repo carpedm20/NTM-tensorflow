@@ -14,15 +14,19 @@ input_dim = 10
 output_dim = 10
 
 min_length = 1
-max_length = 10
+max_length = 2
 
 checkpoint_dir = './checkpoint'
+
+def recall(seq_length):
+    pass
 
 def copy(seq_length):
     with tf.device('/cpu:0'), tf.Session() as sess:
         with tf.variable_scope("NTM") as scope:
             cell = NTMCell(input_dim=input_dim, output_dim=output_dim)
-            ntm = NTM(cell, sess, min_length, max_length, scope=scope)
+            ntm = NTM(cell, sess, min_length, max_length,
+                      scope=scope, forward_only=True)
 
         ntm.load(checkpoint_dir)
 
@@ -42,7 +46,7 @@ def copy(seq_length):
             ntm.end_symbol: end_symbol
         })
 
-        result = sess.run(ntm.outputs + [ntm.losses[seq_length]], feed_dict=feed_dict)
+        result = sess.run(ntm.outputs[seq_length] + [ntm.losses[seq_length]], feed_dict=feed_dict)
 
         outputs = result[0]
         loss = result[1]
@@ -66,7 +70,9 @@ def copy_train():
             cell = NTMCell(input_dim=input_dim, output_dim=output_dim)
             ntm = NTM(cell, sess, min_length, max_length, scope=scope)
 
+        print(" [*] Initialize all variables")
         tf.initialize_all_variables().run()
+        print(" [*] Initialization finished")
 
         start_time = time.time()
         for idx in xrange(epoch):
@@ -92,7 +98,7 @@ def copy_train():
                                global_step = step.astype(int))
 
             if idx % print_interval == 0:
-                print("[%4d] %d: %.2f (%.1fs)" % (idx, seq_length, cost, time.time() - start_time))
+                print("[%5d] %2d: %.2f (%.1fs)" % (idx, seq_length, cost, time.time() - start_time))
 
 def generate_copy_sequence(length, bits):
     seq = np.zeros([length, bits + 2], dtype=np.float32)
