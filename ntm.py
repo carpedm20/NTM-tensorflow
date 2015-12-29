@@ -20,6 +20,9 @@ class NTM(object):
 
         Args:
             cell: An instantce of NTMCell.
+            sess: A TensorFlow session.
+            min_length: Minimum length of input sequence.
+            max_length: Maximum length of input sequence.
             min_grad: (optional) Minimum gradient for gradient clipping [-10].
             max_grad: (optional) Maximum gradient for gradient clipping [+10].
             lr: (optional) Learning rate [1e-4].

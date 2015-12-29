@@ -36,7 +36,7 @@ def copy(ntm, seq_length):
 
 def copy_train():
     epoch = 10000
-    print_interval = 1
+    print_interval = 10
 
     input_dim = 10
     output_dim = 10
@@ -63,15 +63,8 @@ def copy_train():
 
         start_time = time.time()
         for idx in xrange(epoch):
-            logging = False#(idx % print_interval == 0)
-
-            if logging:
-                print("epoch : %d" % epoch)
-                print("learning rate : %f" % ntm.lr)
-                print("t : %.1fs" % (time.time() - start_time))
-
             seq_length = randint(min_length, max_length)
-            seq = generate_sequence(seq_length, input_dim - 2)
+            seq = generate_copy_sequence(seq_length, input_dim - 2)
 
             feed_dict = {input_:vec for vec, input_ in zip(seq, ntm.inputs)}
             feed_dict.update(
@@ -82,6 +75,20 @@ def copy_train():
                 ntm.end_symbol: end_symbol
             })
 
-            cost, _ = sess.run([ntm.losses[seq_length], ntm.optims[seq_length]], feed_dict=feed_dict)
+            _, cost, step = sess.run([ntm.optims[seq_length],
+                                      ntm.losses[seq_length],
+                                      ntm.global_step], feed_dict=feed_dict)
 
-            print(idx, cost, seq_length, time.time() - start_time)
+            if idx % 100 == 0:
+                ntm.saver.save(self.sess,
+                               os.path.join(checkpoint_dir, "NTM.model"),
+                               global_step = ntm.step.astype(int))
+
+            if idx % print_interval == 0:
+                print("[%4d] %d: %.2f (%.1fs)" % (idx, seq_length, cost, time.time() - start_time))
+
+def generate_copy_sequence(length, bits):
+    seq = np.zeros([length, bits + 2], dtype=np.float32)
+    for idx in xrange(length):
+        seq[idx, 2:bits+2] = np.random.rand(bits).round()
+    return list(seq)
