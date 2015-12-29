@@ -9,7 +9,7 @@ FLAGS = flags.FLAGS
 def main(_):
     if FLAGS.task == 'copy':
         copy_train()
-        copy(5)
+        copy(2)
     elif FLAGS.task == 'recall':
         pass
 

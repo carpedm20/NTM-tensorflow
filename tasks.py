@@ -7,14 +7,14 @@ from random import randint
 from ntm import NTM
 from ntm_cell import NTMCell
 
-epoch = 10000
+epoch = 100000
 print_interval = 10
 
 input_dim = 10
 output_dim = 10
 
 min_length = 1
-max_length = 2
+max_length = 20
 
 checkpoint_dir = './checkpoint'
 
@@ -23,10 +23,8 @@ def recall(seq_length):
 
 def copy(seq_length):
     with tf.device('/cpu:0'), tf.Session() as sess:
-        with tf.variable_scope("NTM") as scope:
-            cell = NTMCell(input_dim=input_dim, output_dim=output_dim)
-            ntm = NTM(cell, sess, min_length, max_length,
-                      scope=scope, forward_only=True)
+        cell = NTMCell(input_dim=input_dim, output_dim=output_dim)
+        ntm = NTM(cell, sess, min_length, max_length, forward_only=True)
 
         ntm.load(checkpoint_dir)
 
@@ -66,9 +64,8 @@ def copy_train():
         end_symbol = np.zeros([input_dim], dtype=np.float32)
         end_symbol[1] = 1
 
-        with tf.variable_scope("NTM") as scope:
-            cell = NTMCell(input_dim=input_dim, output_dim=output_dim)
-            ntm = NTM(cell, sess, min_length, max_length, scope=scope)
+        cell = NTMCell(input_dim=input_dim, output_dim=output_dim)
+        ntm = NTM(cell, sess, min_length, max_length)
 
         print(" [*] Initialize all variables")
         tf.initialize_all_variables().run()
