@@ -1,0 +1,6 @@
+model_checkpoint_path: "./checkpoint/NTM.model-258001"
+all_model_checkpoint_paths: "./checkpoint/NTM.model-257601"
+all_model_checkpoint_paths: "./checkpoint/NTM.model-257701"
+all_model_checkpoint_paths: "./checkpoint/NTM.model-257801"
+all_model_checkpoint_paths: "./checkpoint/NTM.model-257901"
+all_model_checkpoint_paths: "./checkpoint/NTM.model-258001"
