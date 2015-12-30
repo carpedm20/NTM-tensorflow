@@ -5,7 +5,7 @@ Tensorflow implementation of [Neural Turing Machine](http://arxiv.org/abs/1410.5
 
 ![alt_tag](NTM.gif)
 
-** Recurrent models of TensorFlow 0.6.0 should have explicitely defined the number of timesteps per sequence and do not support dynamic unrolling (discussed in [here](https://groups.google.com/a/tensorflow.org/d/msg/discuss/DJ_4vYKylbA/sg2XhVodAgAJ) and [here](https://github.com/fchollet/keras/wiki/Keras,-now-running-on-TensorFlow#known-issues)) so there is a limitaion for the current NTM implementation. **
+**Recurrent models of TensorFlow 0.6.0 should have explicitely defined the number of timesteps per sequence and do not support dynamic unrolling (discussed in [here](https://groups.google.com/a/tensorflow.org/d/msg/discuss/DJ_4vYKylbA/sg2XhVodAgAJ) and [here](https://github.com/fchollet/keras/wiki/Keras,-now-running-on-TensorFlow#known-issues)).** Therefore, the current NTM implementation does not show the performance described in the original paper.
 
 
 Prerequisites
@@ -58,7 +58,7 @@ which will print:
 Results
 -------
 
-As described above, current implementation is still incomplete.
+As described above, current implementation is still incomplete. See details in [here](ipynb/NTM\ Test.ipynb)
 
 ![alt_tag](result_15_12_30.png)
 
