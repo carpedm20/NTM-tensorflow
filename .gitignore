@@ -1,10 +1,6 @@
 # log
 log
 
-# checkpoint
-checkpoint
-*.model-*
-
 # test
 dummy
 app.py

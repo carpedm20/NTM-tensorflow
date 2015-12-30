@@ -7,7 +7,7 @@ The referenced torch code and dataset can be found [here](https://github.com/kai
 
 ![alt_tag](NTM.gif)
 
-** Recurrent models of TensorFlow 0.6.0 should have explicitely defined the number of timesteps per sequence and do not support dynamic unrolling (discussed in [here](https://groups.google.com/a/tensorflow.org/d/msg/discuss/DJ_4vYKylbA/sg2XhVodAgAJ) and [here](https://github.com/fchollet/keras/wiki/Keras,-now-running-on-TensorFlow#known-issues)) so there is a limitaion for the current NTM implementation. **
+**Recurrent models of TensorFlow 0.6.0 should have explicitely defined the number of timesteps per sequence and do not support dynamic unrolling (discussed in [here](https://groups.google.com/a/tensorflow.org/d/msg/discuss/DJ_4vYKylbA/sg2XhVodAgAJ) and [here](https://github.com/fchollet/keras/wiki/Keras,-now-running-on-TensorFlow#known-issues)).** Therefore, the current NTM implementation does not show the performance described in the original paper.
 
 
 Prerequisites
@@ -23,11 +23,11 @@ Usage
 
 For the copy task:
 
-    $ python main.py --task copy
+    $ python main.py --task copy --is_train True
 
 For the recall task (in progress):
 
-    $ python main.py --task recall
+    $ python main.py --task recall --is_train True
 
 To see all training options, run:
 
@@ -60,7 +60,7 @@ which will print:
 Results
 -------
 
-As described above, current implementation is still incomplete.
+As described above, current implementation is still incomplete. See details in [here](ipynb/NTM\ Test.ipynb)
 
 ![alt_tag](result_15_12_30.png)
 
