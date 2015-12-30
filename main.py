@@ -9,10 +9,10 @@ flags.DEFINE_integer("input_dim", 10, "Dimension of input [10]")
 flags.DEFINE_integer("output_dim", 10, "Dimension of output [10]")
 flags.DEFINE_integer("min_length", 1, "Minimum length of input sequence [1]")
 flags.DEFINE_integer("max_length", 10, "Maximum length of output sequence [10]")
+flags.DEFINE_string("checkpoint_dir", "checkpoint", "Directory name to save the checkpoints [checkpoint]")
 flags.DEFINE_boolean("is_train", False, "True for training, False for testing [False]")
 FLAGS = flags.FLAGS
 
-checkpoint_dir = './checkpoint'
 def main(_):
     pp.pprint(flags.FLAGS.__flags)
 
@@ -26,7 +26,7 @@ def main(_):
             cell = NTMCell(input_dim=FLAGS.input_dim, output_dim=FLAGS.output_dim)
             ntm = NTM(cell, sess, 1, 20, forward_only=True)
 
-            ntm.load('./checkpoint')
+            ntm.load(FLAGS.checkpoint_dir)
             copy(ntm, 5, sess)
         elif FLAGS.task == 'recall':
             pass

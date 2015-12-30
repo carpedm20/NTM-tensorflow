@@ -47,8 +47,8 @@ def copy(ntm, seq_length, sess, max_length=50, print_=True):
 def copy_train(config):
     sess = config.sess
 
-    if not os.path.isdir(checkpoint_dir):
-        raise Exception(" [!] Directory %s not found" % checkpoint_dir)
+    if not os.path.isdir(config.checkpoint_dir):
+        raise Exception(" [!] Directory %s not found" % config.checkpoint_dir)
 
     # delimiter flag for start and end
     start_symbol = np.zeros([config.input_dim], dtype=np.float32)
@@ -83,7 +83,7 @@ def copy_train(config):
 
         if idx % 100 == 0:
             ntm.saver.save(sess,
-                            os.path.join(checkpoint_dir, "NTM.model"),
+                            os.path.join(config.checkpoint_dir, "NTM.model"),
                             global_step = step.astype(int))
 
         if idx % print_interval == 0:

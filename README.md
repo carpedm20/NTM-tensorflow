@@ -21,11 +21,11 @@ Usage
 
 For the copy task:
 
-    $ python main.py --task copy
+    $ python main.py --task copy --is_train True
 
 For the recall task (in progress):
 
-    $ python main.py --task recall
+    $ python main.py --task recall --is_train True
 
 To see all training options, run:
 
