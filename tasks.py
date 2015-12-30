@@ -8,6 +8,8 @@ from ntm import NTM
 from ntm_cell import NTMCell
 from utils import pp
 
+print_interval = 5
+
 def recall(seq_length):
     pass
 
