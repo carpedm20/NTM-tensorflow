@@ -118,6 +118,7 @@ class NTMCell(object):
                                       bias = True,
                                       scope = "%s_gate_%s" % (gate_name, layer_idx))
 
+                        """
                         in_modules = [
                             Linear(input_, self.controller_dim,
                                    name='%s_gate_1_%s' % (gate_name, layer_idx)),
@@ -138,6 +139,7 @@ class NTMCell(object):
                                                     % (gate_name, layer_idx, read_idx))
                                 )
                         return tf.add_n(in_modules)
+                        """
                 else:
                     def new_gate(gate_name):
                         return linear([output_list[-1], o_prev],
@@ -145,12 +147,14 @@ class NTMCell(object):
                                       bias = True,
                                       scope="%s_gate_%s" % (gate_name, layer_idx))
 
+                        """
                         return tf.add_n([
                             Linear(output_list[-1], self.controller_dim,
                                    name='%s_gate_1_%s' % (gate_name, layer_idx)),
                             Linear(o_prev, self.controller_dim,
                                    name='%s_gate_2_%s' % (gate_name, layer_idx)),
                         ])
+                        """
 
                 # input, forget, and output gates for LSTM
                 i = tf.sigmoid(new_gate('input'))

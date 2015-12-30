@@ -8,7 +8,10 @@ from tensorflow.python.ops import array_ops
 from tensorflow.python.ops.seq2seq import sequence_loss
 
 import ntm_cell
+
+import os
 from ops import binary_cross_entropy_with_logits
+from utils import progress
 
 class NTM(object):
     def __init__(self, cell, sess,
@@ -47,6 +50,7 @@ class NTM(object):
 
         self.inputs = []
         self.outputs = {}
+        self.prev_states = {}
         self.true_outputs = []
         self.start_symbol = tf.placeholder(tf.float32, [self.cell.input_dim],
                                            name='start_symbol')
@@ -67,7 +71,7 @@ class NTM(object):
         self.build_model(forward_only)
 
     def build_model(self, forward_only):
-        print(" [*] Build a NTM model")
+        print(" [*] Building a NTM model")
 
         with tf.variable_scope(self.scope):
             # present start symbol
@@ -76,6 +80,8 @@ class NTM(object):
 
             tf.get_variable_scope().reuse_variables()
             for seq_length in xrange(1, self.max_length + 1):
+                progress(seq_length/float(self.max_length))
+
                 input_ = tf.placeholder(tf.float32, [self.cell.input_dim],
                                         name='input_%s' % seq_length)
                 true_output = tf.placeholder(tf.float32, [self.cell.output_dim],
@@ -90,17 +96,20 @@ class NTM(object):
                 # present end symbol
                 _, state = self.cell(self.end_symbol, prev_state)
 
-                # present targets
-                outputs = []
-                for _ in xrange(seq_length):
-                    output, state = self.cell(zeros, state)
-                    outputs.append(output)
+                self.prev_states[seq_length] = state
 
-                self.outputs[seq_length] = outputs
+                if not forward_only:
+                    # present targets
+                    outputs = []
+                    for _ in xrange(seq_length):
+                        output, state = self.cell(zeros, state)
+                        outputs.append(output)
+
+                    self.outputs[seq_length] = outputs
 
             if not forward_only:
                 for seq_length in xrange(self.min_length, self.max_length + 1):
-                    print(" [*] Build a loss model for seq_length %s" % seq_length)
+                    print(" [*] Building a loss model for seq_length %s" % seq_length)
 
                     loss = sequence_loss(logits=self.outputs[seq_length],
                                         targets=self.true_outputs[0:seq_length],
@@ -110,6 +119,8 @@ class NTM(object):
                                         average_across_batch=False,
                                         softmax_loss_function=\
                                             binary_cross_entropy_with_logits)
+
+                    self.losses[seq_length] = loss 
 
                     if not self.params:
                         self.params = tf.trainable_variables()
@@ -124,13 +135,45 @@ class NTM(object):
                             grads.append(grad)
 
                     self.grads[seq_length] = grads
-                    self.losses[seq_length] = loss 
                     self.optims[seq_length] = self.opt.apply_gradients(zip(grads, self.params),
-                                                                    global_step=self.global_step)
+                                                                        global_step=self.global_step)
 
         self.saver = tf.train.Saver()
 
         print(" [*] Build a NTM model finished")
+
+    def get_outputs(self, seq_length):
+        if not self.outputs.has_key(seq_length):
+            with tf.variable_scope(self.scope):
+                tf.get_variable_scope().reuse_variables()
+
+                zeros = np.zeros(self.cell.input_dim, dtype=np.float32)
+                state = self.prev_states[seq_length]
+
+                outputs = []
+                for _ in xrange(seq_length):
+                    output, state = self.cell(zeros, state)
+                    outputs.append(output)
+
+                self.outputs[seq_length] = outputs
+        return self.outputs[seq_length]
+
+    def get_loss(self, seq_length):
+        if not self.outputs.has_key(seq_length):
+            self.get_outputs(seq_length)
+
+        if not self.losses.has_key(seq_length):
+            loss = sequence_loss(logits=self.outputs[seq_length],
+                                targets=self.true_outputs[0:seq_length],
+                                weights=[1] * seq_length,
+                                num_decoder_symbols=-1, # trash
+                                average_across_timesteps=False,
+                                average_across_batch=False,
+                                softmax_loss_function=\
+                                    binary_cross_entropy_with_logits)
+
+            self.losses[seq_length] = loss 
+        return self.losses[seq_length]
 
     @property
     def loss(self):
@@ -144,6 +187,7 @@ class NTM(object):
         print(" [*] Reading checkpoints...")
         ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
         if ckpt and ckpt.model_checkpoint_path:
-            self.saver.restore(self.sess, ckpt.model_checkpoint_path)
+            ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
+            self.saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
         else:
             raise Exception(" [!] Trest mode but no checkpoint found")

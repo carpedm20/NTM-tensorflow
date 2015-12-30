@@ -6,34 +6,67 @@ from random import randint
 
 from ntm import NTM
 from ntm_cell import NTMCell
-
-epoch = 100000
-print_interval = 10
-
-input_dim = 10
-output_dim = 10
-
-min_length = 1
-max_length = 20
-
-checkpoint_dir = './checkpoint'
+from utils import pp
 
 def recall(seq_length):
     pass
 
-def copy(seq_length):
-    with tf.device('/cpu:0'), tf.Session() as sess:
-        cell = NTMCell(input_dim=input_dim, output_dim=output_dim)
-        ntm = NTM(cell, sess, min_length, max_length, forward_only=True)
+def copy(ntm, seq_length, sess, max_length=50, print_=True):
+    start_symbol = np.zeros([ntm.cell.input_dim], dtype=np.float32)
+    start_symbol[0] = 1
+    end_symbol = np.zeros([ntm.cell.input_dim], dtype=np.float32)
+    end_symbol[1] = 1
 
-        ntm.load(checkpoint_dir)
+    seq = generate_copy_sequence(seq_length, ntm.cell.input_dim - 2)
 
-        start_symbol = np.zeros([ntm.cell.input_dim], dtype=np.float32)
-        start_symbol[0] = 1
-        end_symbol = np.zeros([ntm.cell.input_dim], dtype=np.float32)
-        end_symbol[1] = 1
+    feed_dict = {input_:vec for vec, input_ in zip(seq, ntm.inputs)}
+    feed_dict.update(
+        {true_output:vec for vec, true_output in zip(seq, ntm.true_outputs)}
+    )
+    feed_dict.update({
+        ntm.start_symbol: start_symbol,
+        ntm.end_symbol: end_symbol
+    })
 
-        seq = generate_copy_sequence(seq_length, input_dim - 2)
+    result = sess.run(ntm.get_outputs(seq_length) + [ntm.get_loss(seq_length)], feed_dict=feed_dict)
+
+    outputs = result[:-1]
+    loss = result[-1]
+
+    if print_:
+        np.set_printoptions(suppress=True)
+        print(" true output : ")
+        pp.pprint(seq)
+        print(" predicted output :")
+        pp.pprint(np.round(outputs))
+        print(" Loss : %f" % loss)
+        np.set_printoptions(suppress=False)
+    else:
+        return seq, outputs, loss
+
+def copy_train(config):
+    sess = config.sess
+
+    if not os.path.isdir(checkpoint_dir):
+        raise Exception(" [!] Directory %s not found" % checkpoint_dir)
+
+    # delimiter flag for start and end
+    start_symbol = np.zeros([config.input_dim], dtype=np.float32)
+    start_symbol[0] = 1
+    end_symbol = np.zeros([config.input_dim], dtype=np.float32)
+    end_symbol[1] = 1
+
+    cell = NTMCell(input_dim=config.input_dim, output_dim=config.output_dim)
+    ntm = NTM(cell, sess, config.min_length, config.max_length)
+
+    print(" [*] Initialize all variables")
+    tf.initialize_all_variables().run()
+    print(" [*] Initialization finished")
+
+    start_time = time.time()
+    for idx in xrange(epoch):
+        seq_length = randint(min_length, max_length)
+        seq = generate_copy_sequence(seq_length, config.input_dim - 2)
 
         feed_dict = {input_:vec for vec, input_ in zip(seq, ntm.inputs)}
         feed_dict.update(
@@ -44,58 +77,17 @@ def copy(seq_length):
             ntm.end_symbol: end_symbol
         })
 
-        result = sess.run(ntm.outputs[seq_length] + [ntm.losses[seq_length]], feed_dict=feed_dict)
+        _, cost, step = sess.run([ntm.optims[seq_length],
+                                    ntm.get_loss(seq_length),
+                                    ntm.global_step], feed_dict=feed_dict)
 
-        outputs = result[0]
-        loss = result[1]
+        if idx % 100 == 0:
+            ntm.saver.save(sess,
+                            os.path.join(checkpoint_dir, "NTM.model"),
+                            global_step = step.astype(int))
 
-        print(" true output : %s" % seq)
-        print(" predicted output : %s" % outputs)
-        print(" Loss : %f" % loss)
-
-def copy_train():
-    if not os.path.isdir(checkpoint_dir):
-        raise Exception(" [!] Directory %s not found" % checkpoint_dir)
-
-    with tf.device('/cpu:0'), tf.Session() as sess:
-        # delimiter flag for start and end
-        start_symbol = np.zeros([input_dim], dtype=np.float32)
-        start_symbol[0] = 1
-        end_symbol = np.zeros([input_dim], dtype=np.float32)
-        end_symbol[1] = 1
-
-        cell = NTMCell(input_dim=input_dim, output_dim=output_dim)
-        ntm = NTM(cell, sess, min_length, max_length)
-
-        print(" [*] Initialize all variables")
-        tf.initialize_all_variables().run()
-        print(" [*] Initialization finished")
-
-        start_time = time.time()
-        for idx in xrange(epoch):
-            seq_length = randint(min_length, max_length)
-            seq = generate_copy_sequence(seq_length, input_dim - 2)
-
-            feed_dict = {input_:vec for vec, input_ in zip(seq, ntm.inputs)}
-            feed_dict.update(
-                {true_output:vec for vec, true_output in zip(seq, ntm.true_outputs)}
-            )
-            feed_dict.update({
-                ntm.start_symbol: start_symbol,
-                ntm.end_symbol: end_symbol
-            })
-
-            _, cost, step = sess.run([ntm.optims[seq_length],
-                                      ntm.losses[seq_length],
-                                      ntm.global_step], feed_dict=feed_dict)
-
-            if idx % 100 == 0:
-                ntm.saver.save(sess,
-                               os.path.join(checkpoint_dir, "NTM.model"),
-                               global_step = step.astype(int))
-
-            if idx % print_interval == 0:
-                print("[%5d] %2d: %.2f (%.1fs)" % (idx, seq_length, cost, time.time() - start_time))
+        if idx % print_interval == 0:
+            print("[%5d] %2d: %.2f (%.1fs)" % (idx, seq_length, cost, time.time() - start_time))
 
 def generate_copy_sequence(length, bits):
     seq = np.zeros([length, bits + 2], dtype=np.float32)
