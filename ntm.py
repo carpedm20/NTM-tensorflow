@@ -135,7 +135,9 @@ class NTM(object):
                             grads.append(grad)
 
                     self.grads[seq_length] = grads
-                    self.optims[seq_length] = self.opt.apply_gradients(zip(grads, self.params),
+
+                for seq_length in xrange(self.min_length, self.max_length + 1):
+                    self.optims[seq_length] = self.opt.apply_gradients(zip(self.grads[self.max_length], self.params),
                                                                         global_step=self.global_step)
 
         self.saver = tf.train.Saver()

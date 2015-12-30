@@ -19,7 +19,7 @@ def copy(ntm, seq_length, sess, max_length=50, print_=True):
     end_symbol = np.zeros([ntm.cell.input_dim], dtype=np.float32)
     end_symbol[1] = 1
 
-    seq = generate_copy_sequence(seq_length, ntm.cell.input_dim - 2)
+    seq = generate_copy_sequence(20, seq_length, ntm.cell.input_dim - 2)
 
     feed_dict = {input_:vec for vec, input_ in zip(seq, ntm.inputs)}
     feed_dict.update(
@@ -68,7 +68,7 @@ def copy_train(config):
     start_time = time.time()
     for idx in xrange(config.epoch):
         seq_length = randint(config.min_length, config.max_length)
-        seq = generate_copy_sequence(seq_length, config.input_dim - 2)
+        seq = generate_copy_sequence(config.max_length, seq_length, config.input_dim - 2)
 
         feed_dict = {input_:vec for vec, input_ in zip(seq, ntm.inputs)}
         feed_dict.update(
@@ -91,8 +91,8 @@ def copy_train(config):
         if idx % print_interval == 0:
             print("[%5d] %2d: %.2f (%.1fs)" % (idx, seq_length, cost, time.time() - start_time))
 
-def generate_copy_sequence(length, bits):
-    seq = np.zeros([length, bits + 2], dtype=np.float32)
+def generate_copy_sequence(max_length, length, bits):
+    seq = np.zeros([max_length, bits + 2], dtype=np.float32)
     for idx in xrange(length):
         seq[idx, 2:bits+2] = np.random.rand(bits).round()
     return list(seq)
