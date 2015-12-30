@@ -37,8 +37,8 @@ which will print:
 
     usage: main.py [-h] [--task TASK] [--epoch EPOCH] [--input_dim INPUT_DIM]
                   [--output_dim OUTPUT_DIM] [--min_length MIN_LENGTH]
-                  [--max_length MAX_LENGTH] [--is_train [IS_TRAIN]]
-                  [--nois_train]
+                  [--max_length MAX_LENGTH] [--checkpoint_dir CHECKPOINT_DIR]
+                  [--is_train [IS_TRAIN]] [--nois_train]
 
     optional arguments:
       -h, --help            show this help message and exit
@@ -52,6 +52,8 @@ which will print:
                             Minimum length of input sequence [1]
       --max_length MAX_LENGTH
                             Maximum length of output sequence [10]
+      --checkpoint_dir CHECKPOINT_DIR
+                            Directory name to save the checkpoints [checkpoint]
       --is_train [IS_TRAIN]
                             True for training, False for testing [False]
       --nois_train
