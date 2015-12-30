@@ -47,8 +47,8 @@ def copy(ntm, seq_length, sess, max_length=50, print_=True):
 def copy_train(config):
     sess = config.sess
 
-    if not os.path.isdir(checkpoint_dir):
-        raise Exception(" [!] Directory %s not found" % checkpoint_dir)
+    if not os.path.isdir(config.checkpoint_dir):
+        raise Exception(" [!] Directory %s not found" % config.checkpoint_dir)
 
     # delimiter flag for start and end
     start_symbol = np.zeros([config.input_dim], dtype=np.float32)
@@ -64,8 +64,8 @@ def copy_train(config):
     print(" [*] Initialization finished")
 
     start_time = time.time()
-    for idx in xrange(epoch):
-        seq_length = randint(min_length, max_length)
+    for idx in xrange(config.epoch):
+        seq_length = randint(config.min_length, config.max_length)
         seq = generate_copy_sequence(seq_length, config.input_dim - 2)
 
         feed_dict = {input_:vec for vec, input_ in zip(seq, ntm.inputs)}
@@ -78,13 +78,13 @@ def copy_train(config):
         })
 
         _, cost, step = sess.run([ntm.optims[seq_length],
-                                    ntm.get_loss(seq_length),
-                                    ntm.global_step], feed_dict=feed_dict)
+                                  ntm.get_loss(seq_length),
+                                  ntm.global_step], feed_dict=feed_dict)
 
         if idx % 100 == 0:
             ntm.saver.save(sess,
-                            os.path.join(checkpoint_dir, "NTM.model"),
-                            global_step = step.astype(int))
+                           os.path.join(config.checkpoint_dir, "NTM.model"),
+                           global_step = step.astype(int))
 
         if idx % print_interval == 0:
             print("[%5d] %2d: %.2f (%.1fs)" % (idx, seq_length, cost, time.time() - start_time))
