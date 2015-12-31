@@ -23,13 +23,14 @@ To train a copy task:
 
     $ python main.py --task copy --is_train True
 
-To test a quick copy task:
+To test a *quick* copy task:
 
     $ python main.py --task copy --test_max_length 10
 
-To test a slow copy task with max length 120:
+To test a *slow* copy task with max length 120:
 
     $ python main.py --task copy --test_max_length 120
+
 
 To see all training options, run:
 

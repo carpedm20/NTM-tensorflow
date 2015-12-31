@@ -16,6 +16,7 @@ from utils import progress
 class NTM(object):
     def __init__(self, cell, sess,
                  min_length, max_length,
+                 test_max_length=120,
                  min_grad=-10, max_grad=+10, 
                  lr=1e-4, momentum=0.9, decay=0.95,
                  scope="NTM", forward_only=False):
@@ -25,7 +26,8 @@ class NTM(object):
             cell: An instantce of NTMCell.
             sess: A TensorFlow session.
             min_length: Minimum length of input sequence.
-            max_length: Maximum length of input sequence.
+            max_length: Maximum length of input sequence for training.
+            test_max_length: Maximum length of input sequence for testing.
             min_grad: (optional) Minimum gradient for gradient clipping [-10].
             max_grad: (optional) Maximum gradient for gradient clipping [+10].
             lr: (optional) Learning rate [1e-4].
@@ -47,6 +49,10 @@ class NTM(object):
         self.max_grad = max_grad
         self.min_length = min_length
         self.max_length = max_length
+
+        if forward_only:
+            self._max_length = max_length
+            self.max_length = test_max_length
 
         self.inputs = []
         self.outputs = {}
@@ -186,7 +192,7 @@ class NTM(object):
     def load(self, checkpoint_dir, task_name):
         print(" [*] Reading checkpoints...")
 
-        task_dir = "%s_%s" % (task_name, self.max_length)
+        task_dir = "%s_%s" % (task_name, self._max_length)
         checkpoint_dir = os.path.join(checkpoint_dir, task_dir)
 
         ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
@@ -194,4 +200,4 @@ class NTM(object):
             ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
             self.saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
         else:
-            raise Exception(" [!] Trest mode but no checkpoint found")
+            raise Exception(" [!] Testing, but %s not found" % checkpoint_dir)
