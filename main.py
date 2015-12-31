@@ -23,11 +23,11 @@ def main(_):
     
         if FLAGS.task == 'copy':
             if FLAGS.is_train:
-                copy_train(FLAGS)
-
-            cell = NTMCell(input_dim=FLAGS.input_dim, output_dim=FLAGS.output_dim)
-            ntm = NTM(cell, sess, 1, FLAGS.max_length,
-                      test_max_length=FLAGS.test_max_length, forward_only=True)
+                cell, ntm = copy_train(FLAGS)
+            else:
+                cell = NTMCell(input_dim=FLAGS.input_dim, output_dim=FLAGS.output_dim)
+                ntm = NTM(cell, sess, 1, FLAGS.max_length,
+                          test_max_length=FLAGS.test_max_length, forward_only=True)
 
             ntm.load(FLAGS.checkpoint_dir, 'copy')
 

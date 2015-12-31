@@ -99,6 +99,7 @@ def copy_train(config):
                 % (idx, seq_length, cost, time.time() - start_time))
 
     print("Training Copy task finished")
+    return cell, ntm
 
 def generate_copy_sequence(length, bits):
     seq = np.zeros([length, bits + 2], dtype=np.float32)
