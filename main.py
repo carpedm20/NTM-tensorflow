@@ -9,7 +9,8 @@ flags.DEFINE_integer("epoch", 100000, "Epoch to train [100000]")
 flags.DEFINE_integer("input_dim", 10, "Dimension of input [10]")
 flags.DEFINE_integer("output_dim", 10, "Dimension of output [10]")
 flags.DEFINE_integer("min_length", 1, "Minimum length of input sequence [1]")
-flags.DEFINE_integer("max_length", 20, "Maximum length of output sequence [20]")
+flags.DEFINE_integer("max_length", 10, "Maximum length of output sequence [10]")
+flags.DEFINE_integer("test_max_length", 120, "Maximum length of output sequence [120]")
 flags.DEFINE_string("checkpoint_dir", "checkpoint", "Directory name to save the checkpoints [checkpoint]")
 flags.DEFINE_boolean("is_train", False, "True for training, False for testing [False]")
 FLAGS = flags.FLAGS
@@ -25,12 +26,13 @@ def main(_):
                 copy_train(FLAGS)
 
             cell = NTMCell(input_dim=FLAGS.input_dim, output_dim=FLAGS.output_dim)
-            ntm = NTM(cell, sess, 1, 120, forward_only=True)
 
-            ntm.load(FLAGS.checkpoint_dir)
-            copy(ntm, 40, sess)
-            copy(ntm, 80, sess)
-            copy(ntm, 120, sess)
+            ntm = NTM(cell, sess, 1, FLAGS.test_max_length, forward_only=True)
+
+            ntm.load(FLAGS.checkpoint_dir, 'copy')
+            copy(ntm, FLAGS.test_max_length*1/3, sess)
+            copy(ntm, FLAGS.test_max_length*2/3, sess)
+            copy(ntm, FLAGS.test_max_length*3/3, sess)
         elif FLAGS.task == 'recall':
             pass
 

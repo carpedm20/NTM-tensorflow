@@ -85,7 +85,7 @@ def copy_train(config):
 
         if idx % 100 == 0:
             ntm.saver.save(sess,
-                           os.path.join(config.checkpoint_dir, "NTM_copy.model"),
+                           os.path.join(config.checkpoint_dir, "copy/NTM_copy.model"),
                            global_step = step.astype(int),
                            latest_filename = 'copy_checkpoint')
 
@@ -95,6 +95,12 @@ def copy_train(config):
     print("Training Copy task finished")
 
 def generate_copy_sequence(length, bits):
+    seq = np.zeros([length, bits + 2], dtype=np.float32)
+    for idx in xrange(length):
+        seq[idx, 2:bits+2] = np.random.rand(bits).round()
+    return list(seq)
+
+def generate_recall_sequence(length, num_items):
     seq = np.zeros([length, bits + 2], dtype=np.float32)
     for idx in xrange(length):
         seq[idx, 2:bits+2] = np.random.rand(bits).round()

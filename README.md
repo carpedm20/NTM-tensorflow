@@ -5,7 +5,7 @@ Tensorflow implementation of [Neural Turing Machine](http://arxiv.org/abs/1410.5
 
 ![alt_tag](NTM.gif)
 
-The referenced torch code and dataset can be found [here](https://github.com/kaishengtai/torch-ntm).
+The referenced torch code can be found [here](https://github.com/kaishengtai/torch-ntm).
 
 
 Prerequisites
@@ -23,9 +23,13 @@ To train a copy task:
 
     $ python main.py --task copy --is_train True
 
-To test a copy task:
+To test a quick copy task:
 
-    $ python main.py --task copy
+    $ python main.py --task copy --test_max_length 10
+
+To test a slow copy task with max length 120:
+
+    $ python main.py --task copy --test_max_length 120
 
 To see all training options, run:
 
@@ -40,7 +44,7 @@ which will print:
 
     optional arguments:
       -h, --help            show this help message and exit
-      --task TASK           Task to run [copy]
+      --task TASK           Task to run [copy, recall]
       --epoch EPOCH         Epoch to train [100000]
       --input_dim INPUT_DIM
                             Dimension of input [10]
