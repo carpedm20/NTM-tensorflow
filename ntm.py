@@ -189,6 +189,18 @@ class NTM(object):
     def optim(self):
         return self.optims[self.cell.depth]
 
+    def save(self, checkpoint_dir, task_name):
+        task_dir = "copy_%s" % config.max_length
+        file_name = "NTM_%s.model" % task_name
+
+        if os.path.exists(task_dir):
+            os.makedirs(task_dir)
+
+        ntm.saver.save(self.sess,
+                       os.path.join(checkpoint_dir, task_dir, file_name),
+                       global_step = step.astype(int),
+                       latest_filename = '%s_checkpoint' % task_name
+
     def load(self, checkpoint_dir, task_name):
         print(" [*] Reading checkpoints...")
 

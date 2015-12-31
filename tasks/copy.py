@@ -10,9 +10,6 @@ from ntm_cell import NTMCell
 
 print_interval = 5
 
-def recall(seq_length):
-    pass
-
 def copy(ntm, seq_length, sess, print_=True):
     start_symbol = np.zeros([ntm.cell.input_dim], dtype=np.float32)
     start_symbol[0] = 1
@@ -30,9 +27,13 @@ def copy(ntm, seq_length, sess, print_=True):
         ntm.end_symbol: end_symbol
     })
 
-    result = sess.run(ntm.get_outputs(seq_length) + [ntm.get_loss(seq_length)], feed_dict=feed_dict)
+    result = sess.run(ntm.get_outputs(seq_length) + \
+                      [state['read_w'] for state in ntm.cell.states][:seq_length] + \
+                      [ntm.get_loss(seq_length)],
+                      feed_dict=feed_dict)
 
-    outputs = result[:-1]
+    outputs = result[:seq_length]
+    read_ws = result[seq_length:-1]
     loss = result[-1]
 
     if print_:
@@ -44,7 +45,7 @@ def copy(ntm, seq_length, sess, print_=True):
         print(" Loss : %f" % loss)
         np.set_printoptions(suppress=False)
     else:
-        return seq, outputs, loss
+        return seq, outputs, read_ws, loss
 
 def copy_train(config):
     sess = config.sess
@@ -84,24 +85,15 @@ def copy_train(config):
                                   ntm.global_step], feed_dict=feed_dict)
 
         if idx % 100 == 0:
-            task_dir = "copy_%s" % config.max_length
-            ntm.saver.save(sess,
-                           os.path.join(config.checkpoint_dir, task_dir, "NTM_copy.model"),
-                           global_step = step.astype(int),
-                           latest_filename = 'copy_checkpoint')
+            ntm.save(config.checkpoint_dir, 'copy')
 
         if idx % print_interval == 0:
-            print("[%5d] %2d: %.2f (%.1fs)" % (idx, seq_length, cost, time.time() - start_time))
+            print("[%5d] %2d: %.2f (%.1fs)" \
+                % (idx, seq_length, cost, time.time() - start_time))
 
     print("Training Copy task finished")
 
 def generate_copy_sequence(length, bits):
-    seq = np.zeros([length, bits + 2], dtype=np.float32)
-    for idx in xrange(length):
-        seq[idx, 2:bits+2] = np.random.rand(bits).round()
-    return list(seq)
-
-def generate_recall_sequence(length, num_items):
     seq = np.zeros([length, bits + 2], dtype=np.float32)
     for idx in xrange(length):
         seq[idx, 2:bits+2] = np.random.rand(bits).round()
