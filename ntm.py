@@ -233,7 +233,7 @@ class NTM(object):
         else:
             state_to_add[from_].append(state)
 
-    def save(self, checkpoint_dir, task_name):
+    def save(self, checkpoint_dir, task_name, step):
         task_dir = "copy_%s" % self.max_length
         file_name = "NTM_%s.model" % task_name
 

@@ -92,7 +92,7 @@ def copy_train(config):
                                   ntm.global_step], feed_dict=feed_dict)
 
         if idx % 100 == 0:
-            ntm.save(config.checkpoint_dir, 'copy')
+            ntm.save(config.checkpoint_dir, 'copy', step)
 
         if idx % print_interval == 0:
             print("[%5d] %2d: %.2f (%.1fs)" \
