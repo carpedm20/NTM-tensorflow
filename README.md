@@ -3,7 +3,7 @@ Neural Turing Machine in Tensorflow
 
 Tensorflow implementation of [Neural Turing Machine](http://arxiv.org/abs/1410.5401). This implementation uses an LSTM controller. NTM models with multiple read/write heads are supported.
 
-![alt_tag](NTM.gif)
+![alt_tag](etc/NTM.gif)
 
 The referenced torch code can be found [here](https://github.com/kaishengtai/torch-ntm).
 
@@ -31,14 +31,16 @@ To test a *quick* copy task:
 Results
 -------
 
-See details in [here](ipynb/NTM\ Test.ipynb)
+More detailed results can be found [here](ipynb/NTM\ Test.ipynb)
 
 Copy task:
 
-![alt_tag](result_15_12_31.png)
+![alt_tag](etc/result_1.png)
+![alt_tag](etc/result_2.png)
 
-Recall task (in progress):
+Recall task:
 
+(in progress)
 
 
 Author
