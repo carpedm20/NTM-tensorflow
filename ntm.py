@@ -196,6 +196,19 @@ class NTM(object):
             self.losses[seq_length] = loss 
         return self.losses[seq_length]
 
+    def get_output_states(self, seq_length):
+        if not self.output_states.has_key(seq_length):
+            outputs = []
+            state = self.prev_states[seq_length]
+
+            for _ in xrange(seq_length):
+                output, state = self.cell(zeros, state)
+                self.save_state(state, seq_length, is_output=True)
+                outputs.append(output)
+
+            self.outputs[seq_length] = outputs
+        return output_states[seq_length]
+
     @property
     def loss(self):
         return self.losses[self.cell.depth]
@@ -223,7 +236,7 @@ class NTM(object):
         if not os.path.exists(task_dir):
             os.makedirs(task_dir)
 
-        ntm.saver.save(self.sess,
+        self.saver.save(self.sess,
                        os.path.join(checkpoint_dir, task_dir, file_name),
                        global_step = step.astype(int),
                        latest_filename = '%s_checkpoint' % task_name)
