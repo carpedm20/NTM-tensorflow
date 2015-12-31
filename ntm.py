@@ -131,18 +131,22 @@ class NTM(object):
                     if not self.params:
                         self.params = tf.trainable_variables()
 
-                    #grads, norm = tf.clip_by_global_norm(tf.gradients(loss, self.params), 5)
+                    #grads, norm = tf.clip_by_global_norm(
+                    #                  tf.gradients(loss, self.params), 5)
 
                     grads = []
                     for grad in tf.gradients(loss, self.params):
                         if grad:
-                            grads.append(tf.clip_by_value(grad, self.min_grad, self.max_grad))
+                            grads.append(tf.clip_by_value(grad,
+                                                          self.min_grad,
+                                                          self.max_grad))
                         else:
                             grads.append(grad)
 
                     self.grads[seq_length] = grads
-                    self.optims[seq_length] = self.opt.apply_gradients(zip(grads, self.params),
-                                                                        global_step=self.global_step)
+                    self.optims[seq_length] = self.opt.apply_gradients(
+                                                  zip(grads, self.params),
+                                                  global_step=self.global_step)
 
         self.saver = tf.train.Saver()
 
@@ -199,7 +203,7 @@ class NTM(object):
         ntm.saver.save(self.sess,
                        os.path.join(checkpoint_dir, task_dir, file_name),
                        global_step = step.astype(int),
-                       latest_filename = '%s_checkpoint' % task_name
+                       latest_filename = '%s_checkpoint' % task_name)
 
     def load(self, checkpoint_dir, task_name):
         print(" [*] Reading checkpoints...")
