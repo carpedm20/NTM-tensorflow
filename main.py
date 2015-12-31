@@ -4,7 +4,7 @@ from tasks import *
 from utils import pp
 
 flags = tf.app.flags
-flags.DEFINE_string("task", "copy", "Task to run [copy]")
+flags.DEFINE_string("task", "copy", "Task to run [copy, recall]")
 flags.DEFINE_integer("epoch", 100000, "Epoch to train [100000]")
 flags.DEFINE_integer("input_dim", 10, "Dimension of input [10]")
 flags.DEFINE_integer("output_dim", 10, "Dimension of output [10]")
@@ -25,11 +25,10 @@ def main(_):
                 copy_train(FLAGS)
 
             cell = NTMCell(input_dim=FLAGS.input_dim, output_dim=FLAGS.output_dim)
-            ntm = NTM(cell, sess, 1, 40, forward_only=True)
+            ntm = NTM(cell, sess, 1, 100, forward_only=True)
 
             ntm.load(FLAGS.checkpoint_dir)
-            import ipdb; ipdb.set_trace() 
-            copy(ntm, 20, sess)
+            copy(ntm, 50, sess)
         elif FLAGS.task == 'recall':
             pass
 

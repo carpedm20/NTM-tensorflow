@@ -3,9 +3,9 @@ Neural Turing Machine in Tensorflow
 
 Tensorflow implementation of [Neural Turing Machine](http://arxiv.org/abs/1410.5401). This implementation uses an LSTM controller. NTM models with multiple read/write heads are supported.
 
-The referenced torch code and dataset can be found [here](https://github.com/kaishengtai/torch-ntm).
-
 ![alt_tag](NTM.gif)
+
+The referenced torch code and dataset can be found [here](https://github.com/kaishengtai/torch-ntm).
 
 
 Prerequisites

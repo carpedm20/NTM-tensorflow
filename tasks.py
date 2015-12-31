@@ -98,6 +98,8 @@ def copy_train(config):
         if idx % print_interval == 0:
             print("[%5d] %2d: %.2f (%.1fs)" % (idx, seq_length, cost, time.time() - start_time))
 
+    print("Training Copy task finished")
+
 def generate_copy_sequence(length, bits):
     seq = np.zeros([length, bits + 2], dtype=np.float32)
     for idx in xrange(length):
