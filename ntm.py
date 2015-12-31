@@ -197,7 +197,7 @@ class NTM(object):
         task_dir = "copy_%s" % config.max_length
         file_name = "NTM_%s.model" % task_name
 
-        if os.path.exists(task_dir):
+        if not os.path.exists(task_dir):
             os.makedirs(task_dir)
 
         ntm.saver.save(self.sess,
