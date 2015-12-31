@@ -33,12 +33,12 @@ Results
 
 More detailed results can be found [here](ipynb/NTM\ Test.ipynb).
 
-Copy task:
+**Copy task:**
 
 ![alt_tag](etc/result1.png)
 ![alt_tag](etc/result2.png)
 
-Recall task:
+**Recall task:**
 
 (in progress)
 
