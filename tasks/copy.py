@@ -29,11 +29,13 @@ def copy(ntm, seq_length, sess, print_=True):
 
     result = sess.run(ntm.get_outputs(seq_length) + \
                       [state['read_w'] for state in ntm.cell.states][:seq_length] + \
+                      [state['write_w'] for state in ntm.cell.states][:seq_length] + \
                       [ntm.get_loss(seq_length)],
                       feed_dict=feed_dict)
 
     outputs = result[:seq_length]
-    read_ws = result[seq_length:-1]
+    read_ws = result[seq_length:2*seq_length]
+    write_ws = result[2*seq_length:3*seq_length]
     loss = result[-1]
 
     if print_:

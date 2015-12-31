@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import numpy as np
 import tensorflow as tf
+from collections import defaultdict
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops.seq2seq import sequence_loss
 
@@ -56,8 +57,12 @@ class NTM(object):
 
         self.inputs = []
         self.outputs = {}
-        self.prev_states = {}
         self.true_outputs = []
+
+        self.prev_states = {}
+        self.input_states = defaultdict(list)
+        self.output_states = defaultdict(list)
+
         self.start_symbol = tf.placeholder(tf.float32, [self.cell.input_dim],
                                            name='start_symbol')
         self.end_symbol = tf.placeholder(tf.float32, [self.cell.input_dim],
@@ -82,6 +87,8 @@ class NTM(object):
         with tf.variable_scope(self.scope):
             # present start symbol
             _, prev_state = self.cell(self.start_symbol, state=None)
+            self.save_state(prev_state, 0, self.max_length)
+
             zeros = np.zeros(self.cell.input_dim, dtype=np.float32)
 
             tf.get_variable_scope().reuse_variables()
@@ -98,9 +105,11 @@ class NTM(object):
 
                 # present inputs
                 _, prev_state = self.cell(input_, prev_state)
+                self.save_state(prev_state, seq_length, self.max_length)
 
                 # present end symbol
                 _, state = self.cell(self.end_symbol, prev_state)
+                self.save_state(state, seq_length, self.max_length)
 
                 self.prev_states[seq_length] = state
 
@@ -109,6 +118,7 @@ class NTM(object):
                     outputs = []
                     for _ in xrange(seq_length):
                         output, state = self.cell(zeros, state)
+                        self.save_state(state, seq_length, is_output=True)
                         outputs.append(output)
 
                     self.outputs[seq_length] = outputs
@@ -163,6 +173,7 @@ class NTM(object):
                 outputs = []
                 for _ in xrange(seq_length):
                     output, state = self.cell(zeros, state)
+                    self.save_state(state, seq_length, is_output=True)
                     outputs.append(output)
 
                 self.outputs[seq_length] = outputs
@@ -193,8 +204,20 @@ class NTM(object):
     def optim(self):
         return self.optims[self.cell.depth]
 
+    def save_state(self, state, from_, to=None, is_output=False):
+        if is_output:
+            state_to_add = self.output_states
+        else:
+            state_to_add = self.input_states
+
+        if to:
+            for idx in xrange(from_, to):
+                state_to_add[idx].append(state)
+        else:
+            state_to_add[from_].append(state)
+
     def save(self, checkpoint_dir, task_name):
-        task_dir = "copy_%s" % config.max_length
+        task_dir = "copy_%s" % self.max_length
         file_name = "NTM_%s.model" % task_name
 
         if not os.path.exists(task_dir):
