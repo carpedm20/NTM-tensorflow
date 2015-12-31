@@ -27,15 +27,20 @@ def copy(ntm, seq_length, sess, print_=True):
         ntm.end_symbol: end_symbol
     })
 
+    input_states = [state['write_w'] for state in ntm.input_states[seq_length]]
+    output_states = [state['read_w'] for state in ntm.output_states[seq_length]]
+
     result = sess.run(ntm.get_outputs(seq_length) + \
-                      [state['read_w'] for state in ntm.cell.states][:seq_length] + \
-                      [state['write_w'] for state in ntm.cell.states][:seq_length] + \
+                      input_states + output_states + \
                       [ntm.get_loss(seq_length)],
                       feed_dict=feed_dict)
 
+    is_sz = len(input_states)
+    os_sz = len(output_states)
+
     outputs = result[:seq_length]
-    read_ws = result[seq_length:2*seq_length]
-    write_ws = result[2*seq_length:3*seq_length]
+    read_ws = result[seq_length:seq_length + is_sz]
+    write_ws = result[seq_length + is_sz:seq_length + is_sz + os_sz]
     loss = result[-1]
 
     if print_:
@@ -47,7 +52,7 @@ def copy(ntm, seq_length, sess, print_=True):
         print(" Loss : %f" % loss)
         np.set_printoptions(suppress=False)
     else:
-        return seq, outputs, read_ws, loss
+        return seq, outputs, read_ws, write_ws, loss
 
 def copy_train(config):
     sess = config.sess

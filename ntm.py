@@ -109,7 +109,7 @@ class NTM(object):
 
                 # present end symbol
                 _, state = self.cell(self.end_symbol, prev_state)
-                self.save_state(state, seq_length, self.max_length)
+                self.save_state(state, seq_length)
 
                 self.prev_states[seq_length] = state
 
@@ -211,7 +211,7 @@ class NTM(object):
             state_to_add = self.input_states
 
         if to:
-            for idx in xrange(from_, to):
+            for idx in xrange(from_, to+1):
                 state_to_add[idx].append(state)
         else:
             state_to_add[from_].append(state)
