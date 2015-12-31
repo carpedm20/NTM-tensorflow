@@ -185,7 +185,10 @@ class NTM(object):
 
     def load(self, checkpoint_dir, task_name):
         print(" [*] Reading checkpoints...")
-        checkpoint_dir = os.path.join(checkpoint_dir, task_name)
+
+        task_dir = "%s_%s" % (task_name, self.max_length)
+        checkpoint_dir = os.path.join(checkpoint_dir, task_dir)
+
         ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
         if ckpt and ckpt.model_checkpoint_path:
             ckpt_name = os.path.basename(ckpt.model_checkpoint_path)

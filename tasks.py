@@ -84,8 +84,9 @@ def copy_train(config):
                                   ntm.global_step], feed_dict=feed_dict)
 
         if idx % 100 == 0:
+            task_dir = "copy_%s" % config.max_length
             ntm.saver.save(sess,
-                           os.path.join(config.checkpoint_dir, "copy/NTM_copy.model"),
+                           os.path.join(config.checkpoint_dir, task_dir, "NTM_copy.model"),
                            global_step = step.astype(int),
                            latest_filename = 'copy_checkpoint')
 
