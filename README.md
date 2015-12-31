@@ -31,6 +31,8 @@ To test a *quick* copy task:
 Results
 -------
 
+See details in [here](ipynb/NTM\ Test.ipynb)
+
 Copy task:
 
 ![alt_tag](result_15_12_31.png)
