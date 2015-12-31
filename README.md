@@ -36,7 +36,7 @@ More detailed results can be found [here](ipynb/NTM\ Test.ipynb).
 **Copy task:**
 
 ![alt_tag](etc/result1.png)
-![alt_tag](etc/result2.png)
+![alt_tag](etc/result3.png)
 
 **Recall task:**
 
