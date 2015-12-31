@@ -1,5 +1,6 @@
 import sys
 import pprint
+import numpy as np
 import tensorflow as tf
 
 pp = pprint.PrettyPrinter()
