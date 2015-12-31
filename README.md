@@ -7,6 +7,8 @@ Tensorflow implementation of [Neural Turing Machine](http://arxiv.org/abs/1410.5
 
 The referenced torch code can be found [here](https://github.com/kaishengtai/torch-ntm).
 
+**Known issue: Loss sometimes goes to nan even with the gradient clipping ([#2](https://github.com/carpedm20/NTM-tensorflow/issues/2))**
+
 
 Prerequisites
 -------------
