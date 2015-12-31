@@ -19,13 +19,13 @@ Prerequisites
 Usage
 -----
 
-For the copy task:
+To train a copy task:
 
     $ python main.py --task copy --is_train True
 
-For the recall task (in progress):
+To test a copy task:
 
-    $ python main.py --task recall --is_train True
+    $ python main.py --task copy
 
 To see all training options, run:
 

@@ -5,19 +5,13 @@ import tensorflow as tf
 from random import randint
 
 from ntm import NTM
+from utils import pprint
 from ntm_cell import NTMCell
 
 print_interval = 5
 
 def recall(seq_length):
     pass
-
-def pprint(seq):
-    seq = np.array(seq)
-    seq = np.char.mod('%d', np.around(seq))
-    seq[seq == '1'] = '#'
-    seq[seq == '0'] = ' '
-    print("\n".join(["".join(x) for x in seq.tolist()]))
 
 def copy(ntm, seq_length, sess, print_=True):
     start_symbol = np.zeros([ntm.cell.input_dim], dtype=np.float32)

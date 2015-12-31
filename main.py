@@ -25,10 +25,12 @@ def main(_):
                 copy_train(FLAGS)
 
             cell = NTMCell(input_dim=FLAGS.input_dim, output_dim=FLAGS.output_dim)
-            ntm = NTM(cell, sess, 1, 100, forward_only=True)
+            ntm = NTM(cell, sess, 1, 120, forward_only=True)
 
             ntm.load(FLAGS.checkpoint_dir)
-            copy(ntm, 50, sess)
+            copy(ntm, 40, sess)
+            copy(ntm, 80, sess)
+            copy(ntm, 120, sess)
         elif FLAGS.task == 'recall':
             pass
 

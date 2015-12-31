@@ -4,6 +4,11 @@ import tensorflow as tf
 
 pp = pprint.PrettyPrinter()
 
+try:
+    xrange
+except NameError:
+    xrange = range
+
 def progress(progress):
     barLength = 20 # Modify this to change the length of the progress bar
     status = ""
@@ -23,10 +28,12 @@ def progress(progress):
     sys.stdout.write(text)
     sys.stdout.flush()
 
-try:
-    xrange
-except NameError:
-    xrange = range
+def pprint(seq):
+    seq = np.array(seq)
+    seq = np.char.mod('%d', np.around(seq))
+    seq[seq == '1'] = '#'
+    seq[seq == '0'] = ' '
+    print("\n".join(["".join(x) for x in seq.tolist()]))
 
 def gather(m_or_v, idx):
     if len(m_or_v.get_shape()) > 1:
