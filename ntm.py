@@ -16,7 +16,7 @@ from utils import progress
 class NTM(object):
     def __init__(self, cell, sess,
                  min_length, max_length,
-                 min_grad=-100, max_grad=+100, 
+                 min_grad=-10, max_grad=+10, 
                  lr=1e-4, momentum=0.9, decay=0.95,
                  scope="NTM", forward_only=False):
         """Create a neural turing machine specified by NTMCell "cell".

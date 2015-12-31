@@ -7,8 +7,6 @@ The referenced torch code and dataset can be found [here](https://github.com/kai
 
 ![alt_tag](NTM.gif)
 
-**Recurrent models of TensorFlow 0.6.0 should have explicitely defined the number of timesteps per sequence and do not support dynamic unrolling (discussed in [here](https://groups.google.com/a/tensorflow.org/d/msg/discuss/DJ_4vYKylbA/sg2XhVodAgAJ) and [here](https://github.com/fchollet/keras/wiki/Keras,-now-running-on-TensorFlow#known-issues)).** Therefore, the current NTM implementation does not show the performance described in the original paper.
-
 
 Prerequisites
 -------------
@@ -51,7 +49,7 @@ which will print:
       --min_length MIN_LENGTH
                             Minimum length of input sequence [1]
       --max_length MAX_LENGTH
-                            Maximum length of output sequence [10]
+                            Maximum length of output sequence [20]
       --checkpoint_dir CHECKPOINT_DIR
                             Directory name to save the checkpoints [checkpoint]
       --is_train [IS_TRAIN]
@@ -62,9 +60,12 @@ which will print:
 Results
 -------
 
-As described above, current implementation is still incomplete. See details in [here](ipynb/NTM\ Test.ipynb)
+Copy task:
 
-![alt_tag](result_15_12_30.png)
+![alt_tag](result_15_12_31.png)
+
+Recall task (in progress):
+
 
 
 Author

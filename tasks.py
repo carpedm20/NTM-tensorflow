@@ -6,14 +6,20 @@ from random import randint
 
 from ntm import NTM
 from ntm_cell import NTMCell
-from utils import pp
 
 print_interval = 5
 
 def recall(seq_length):
     pass
 
-def copy(ntm, seq_length, sess, max_length=50, print_=True):
+def pprint(seq):
+    seq = np.array(seq)
+    seq = np.char.mod('%d', np.around(seq))
+    seq[seq == '1'] = '#'
+    seq[seq == '0'] = ' '
+    print("\n".join(["".join(x) for x in seq.tolist()]))
+
+def copy(ntm, seq_length, sess, print_=True):
     start_symbol = np.zeros([ntm.cell.input_dim], dtype=np.float32)
     start_symbol[0] = 1
     end_symbol = np.zeros([ntm.cell.input_dim], dtype=np.float32)
@@ -38,9 +44,9 @@ def copy(ntm, seq_length, sess, max_length=50, print_=True):
     if print_:
         np.set_printoptions(suppress=True)
         print(" true output : ")
-        pp.pprint(seq)
+        pprint(seq)
         print(" predicted output :")
-        pp.pprint(np.round(outputs))
+        pprint(np.round(outputs))
         print(" Loss : %f" % loss)
         np.set_printoptions(suppress=False)
     else:
@@ -85,8 +91,9 @@ def copy_train(config):
 
         if idx % 100 == 0:
             ntm.saver.save(sess,
-                           os.path.join(config.checkpoint_dir, "NTM.model"),
-                           global_step = step.astype(int))
+                           os.path.join(config.checkpoint_dir, "NTM_copy.model"),
+                           global_step = step.astype(int),
+                           latest_filename = 'copy_checkpoint')
 
         if idx % print_interval == 0:
             print("[%5d] %2d: %.2f (%.1fs)" % (idx, seq_length, cost, time.time() - start_time))
