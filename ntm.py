@@ -197,17 +197,21 @@ class NTM(object):
         return self.losses[seq_length]
 
     def get_output_states(self, seq_length):
+        zeros = np.zeros(self.cell.input_dim, dtype=np.float32)
+
         if not self.output_states.has_key(seq_length):
-            outputs = []
-            state = self.prev_states[seq_length]
+            with tf.variable_scope(self.scope):
+                tf.get_variable_scope().reuse_variables()
 
-            for _ in xrange(seq_length):
-                output, state = self.cell(zeros, state)
-                self.save_state(state, seq_length, is_output=True)
-                outputs.append(output)
+                outputs = []
+                state = self.prev_states[seq_length]
 
-            self.outputs[seq_length] = outputs
-        return output_states[seq_length]
+                for _ in xrange(seq_length):
+                    output, state = self.cell(zeros, state)
+                    self.save_state(state, seq_length, is_output=True)
+                    outputs.append(output)
+                self.outputs[seq_length] = outputs
+        return self.output_states[seq_length]
 
     @property
     def loss(self):
