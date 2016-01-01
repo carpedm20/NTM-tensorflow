@@ -66,7 +66,11 @@ def copy_train(config):
     end_symbol = np.zeros([config.input_dim], dtype=np.float32)
     end_symbol[1] = 1
 
-    cell = NTMCell(input_dim=config.input_dim, output_dim=config.output_dim)
+    cell = NTMCell(input_dim=config.input_dim,
+                   output_dim=config.output_dim,
+                   controller_layer_size=config.controller_layer_size,
+                   write_head_size=config.write_head_size,
+                   read_head_size=config.read_head_size)
     ntm = NTM(cell, sess, config.min_length, config.max_length)
 
     print(" [*] Initialize all variables")
