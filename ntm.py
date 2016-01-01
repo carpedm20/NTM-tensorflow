@@ -81,13 +81,14 @@ class NTM(object):
                                              momentum=self.momentum)
         self.build_model(forward_only)
 
-    def build_model(self, forward_only):
+    def build_model(self, forward_only, is_copy=True):
         print(" [*] Building a NTM model")
 
         with tf.variable_scope(self.scope):
             # present start symbol
-            _, prev_state = self.cell(self.start_symbol, state=None)
-            self.save_state(prev_state, 0, self.max_length)
+            if is_copy:
+                _, prev_state = self.cell(self.start_symbol, state=None)
+                self.save_state(prev_state, 0, self.max_length)
 
             zeros = np.zeros(self.cell.input_dim, dtype=np.float32)
 
@@ -108,8 +109,9 @@ class NTM(object):
                 self.save_state(prev_state, seq_length, self.max_length)
 
                 # present end symbol
-                _, state = self.cell(self.end_symbol, prev_state)
-                self.save_state(state, seq_length)
+                if is_copy:
+                    _, state = self.cell(self.end_symbol, prev_state)
+                    self.save_state(state, seq_length)
 
                 self.prev_states[seq_length] = state
 
@@ -159,7 +161,6 @@ class NTM(object):
                                                   global_step=self.global_step)
 
         self.saver = tf.train.Saver()
-
         print(" [*] Build a NTM model finished")
 
     def get_outputs(self, seq_length):
