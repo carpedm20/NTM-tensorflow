@@ -243,8 +243,7 @@ class NTM(object):
 
         self.saver.save(self.sess,
                        os.path.join(task_dir, file_name),
-                       global_step = step.astype(int),
-                       latest_filename = '%s_checkpoint' % task_name)
+                       global_step = step.astype(int))
 
     def load(self, checkpoint_dir, task_name):
         print(" [*] Reading checkpoints...")
@@ -252,9 +251,7 @@ class NTM(object):
         task_dir = "%s_%s" % (task_name, self.max_length)
         checkpoint_dir = os.path.join(checkpoint_dir, task_dir)
 
-        ckpt = tf.train.get_checkpoint_state(checkpoint_dir,
-                                             latest_filename='%s_checkpoint' \
-                                                 % task_name)
+        ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
         if ckpt and ckpt.model_checkpoint_path:
             ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
             self.saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))

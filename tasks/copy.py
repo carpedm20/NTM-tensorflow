@@ -27,8 +27,8 @@ def copy(ntm, seq_length, sess, print_=True):
         ntm.end_symbol: end_symbol
     })
 
-    input_states = [state['write_w'] for state in ntm.input_states[seq_length]]
-    output_states = [state['read_w'] for state in ntm.get_output_states(seq_length)]
+    input_states = [state['write_w'][0] for state in ntm.input_states[seq_length]]
+    output_states = [state['read_w'][0] for state in ntm.get_output_states(seq_length)]
 
     result = sess.run(ntm.get_outputs(seq_length) + \
                       input_states + output_states + \
