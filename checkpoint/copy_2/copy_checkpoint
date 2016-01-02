@@ -1,0 +1,2 @@
+model_checkpoint_path: "checkpoint/copy_2/NTM_copy.model-1"
+all_model_checkpoint_paths: "checkpoint/copy_2/NTM_copy.model-1"

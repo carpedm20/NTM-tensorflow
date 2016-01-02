@@ -1,0 +1,6 @@
+model_checkpoint_path: "checkpoint/copy_1/NTM_copy.model-1201"
+all_model_checkpoint_paths: "checkpoint/copy_1/NTM_copy.model-801"
+all_model_checkpoint_paths: "checkpoint/copy_1/NTM_copy.model-901"
+all_model_checkpoint_paths: "checkpoint/copy_1/NTM_copy.model-1001"
+all_model_checkpoint_paths: "checkpoint/copy_1/NTM_copy.model-1101"
+all_model_checkpoint_paths: "checkpoint/copy_1/NTM_copy.model-1201"
