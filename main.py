@@ -22,11 +22,9 @@ def main(_):
     pp.pprint(flags.FLAGS.__flags)
 
     with tf.device('/cpu:0'), tf.Session() as sess:
-        FLAGS.sess = sess
-    
         if FLAGS.task == 'copy':
             if FLAGS.is_train:
-                cell, ntm = copy_train(FLAGS)
+                cell, ntm = copy_train(FLAGS, sess)
             else:
                 cell = NTMCell(input_dim=FLAGS.input_dim,
                                output_dim=FLAGS.output_dim,

@@ -3,6 +3,7 @@ import pprint
 import numpy as np
 import tensorflow as tf
 
+eps = 1e-12
 pp = pprint.PrettyPrinter()
 
 try:
@@ -59,9 +60,9 @@ def softmax(x):
         x: a 2-D `Tensor` (matrix) or 1-D `Tensor` (vector)
     """
     try:
-        return tf.nn.softmax(x)
+        return tf.nn.softmax(x + eps)
     except:
-        return tf.reshape(tf.nn.softmax(tf.reshape(x, [1, -1])), [-1])
+        return tf.reshape(tf.nn.softmax(tf.reshape(x + eps, [1, -1])), [-1])
 
 def matmul(x, y):
     """Compute matrix multiplication.

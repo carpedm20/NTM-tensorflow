@@ -54,9 +54,7 @@ def copy(ntm, seq_length, sess, print_=True):
     else:
         return seq, outputs, read_ws, write_ws, loss
 
-def copy_train(config):
-    sess = config.sess
-
+def copy_train(config, sess):
     if not os.path.isdir(config.checkpoint_dir):
         raise Exception(" [!] Directory %s not found" % config.checkpoint_dir)
 
