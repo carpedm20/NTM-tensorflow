@@ -177,7 +177,7 @@ class NTMCell(object):
                                                               last_output, 0)
 
                 M_erase = tf.ones([self.mem_size, self.mem_dim]) \
-                              - outer_product(write_w, erase)
+                                  - outer_product(write_w, erase)
                 M_write = outer_product(write_w, write)
 
                 write_w_list = [write_w]
@@ -201,7 +201,7 @@ class NTMCell(object):
                     erase_list.append(erase_idx)
 
                     M_erases.append(tf.ones([self.mem_size, self.mem_dim]) \
-                                    * outer_product(write_w_idx, erase_idx))
+                                    - outer_product(write_w_idx, erase_idx))
                     M_writes.append(outer_product(write_w_idx, write_idx))
 
                 M_erase = reduce(lambda x, y: x*y, M_erases)
