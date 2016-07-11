@@ -147,7 +147,7 @@ class NTM(object):
 
                     grads = []
                     for grad in tf.gradients(loss, self.params):
-                        if grad:
+                        if grad is not None:
                             grads.append(tf.clip_by_value(grad,
                                                           self.min_grad,
                                                           self.max_grad))
