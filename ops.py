@@ -100,7 +100,7 @@ def Linear(input_, output_size, stddev=0.5,
 
         if is_range:
             def identity_initializer(tensor):
-                def _initializer(shape, dtype=tf.float32):
+                def _initializer(shape, dtype=tf.float32, partition_info=None):
                     return tf.identity(tensor)
                 return _initializer
 
@@ -214,7 +214,7 @@ def binary_cross_entropy_with_logits(logits, targets, name=None):
         targets: A `Tensor` of the same type and shape as `logits`.
     """
     eps = 1e-12
-    with ops.op_scope([logits, targets], name, "bce_loss") as name:
+    with ops.name_scope(name, "bce_loss", [logits, targets]) as name:
         logits = ops.convert_to_tensor(logits, name="logits")
         targets = ops.convert_to_tensor(targets, name="targets")
         return -math_ops.reduce_mean(logits * math_ops.log(targets + eps) +
