@@ -1,6 +1,10 @@
-import tensorflow as tf
+from __future__ import absolute_import
 
-from tasks import *
+import importlib
+import tensorflow as tf
+from ntm_cell import NTMCell
+from ntm import NTM
+
 from utils import pp
 
 flags = tf.app.flags
@@ -18,31 +22,47 @@ flags.DEFINE_string("checkpoint_dir", "checkpoint", "Directory name to save the 
 flags.DEFINE_boolean("is_train", False, "True for training, False for testing [False]")
 FLAGS = flags.FLAGS
 
+
+def create_ntm(FLAGS, sess, **ntm_args):
+    cell = NTMCell(
+        input_dim=FLAGS.input_dim,
+        output_dim=FLAGS.output_dim,
+        controller_layer_size=FLAGS.controller_layer_size,
+        write_head_size=FLAGS.write_head_size,
+        read_head_size=FLAGS.read_head_size)
+    ntm = NTM(
+        cell, sess, FLAGS.min_length, FLAGS.max_length,
+        test_max_length=FLAGS.test_max_length, **ntm_args)
+    return cell, ntm
+
+
 def main(_):
     pp.pprint(flags.FLAGS.__flags)
 
     with tf.device('/cpu:0'), tf.Session() as sess:
+        try:
+            task = importlib.import_module('tasks.%s' % FLAGS.task)
+        except ImportError:
+            print("task '%s' does not have implementation" % FLAGS.task)
+            raise
+
+        if FLAGS.is_train:
+            cell, ntm = create_ntm(FLAGS, sess)
+            task.train(ntm, FLAGS, sess)
+        else:
+            cell, ntm = create_ntm(FLAGS, sess, forward_only=True)
+
+        ntm.load(FLAGS.checkpoint_dir, FLAGS.task)
+
         if FLAGS.task == 'copy':
-            if FLAGS.is_train:
-                cell, ntm = copy_train(FLAGS, sess)
-            else:
-                cell = NTMCell(input_dim=FLAGS.input_dim,
-                               output_dim=FLAGS.output_dim,
-                               controller_layer_size=FLAGS.controller_layer_size,
-                               write_head_size=FLAGS.write_head_size,
-                               read_head_size=FLAGS.read_head_size)
-                ntm = NTM(cell, sess, 1, FLAGS.max_length,
-                          test_max_length=FLAGS.test_max_length, forward_only=True)
-
-            ntm.load(FLAGS.checkpoint_dir, 'copy')
-
-            copy(ntm, FLAGS.test_max_length*1/3, sess)
+            task.run(ntm, FLAGS.test_max_length * 1 / 3, sess)
             print
-            copy(ntm, FLAGS.test_max_length*2/3, sess)
+            task.run(ntm, FLAGS.test_max_length * 2 / 3, sess)
             print
-            copy(ntm, FLAGS.test_max_length*3/3, sess)
-        elif FLAGS.task == 'recall':
-            pass
+            task.run(ntm, FLAGS.test_max_length * 3 / 3, sess)
+        else:
+            task.run(ntm, FLAGS.test_max_length, sess)
+
 
 if __name__ == '__main__':
     tf.app.run()
