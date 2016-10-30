@@ -10,7 +10,8 @@ from ntm_cell import NTMCell
 
 print_interval = 5
 
-def copy(ntm, seq_length, sess, print_=True):
+
+def run(ntm, seq_length, sess, print_=True):
     start_symbol = np.zeros([ntm.cell.input_dim], dtype=np.float32)
     start_symbol[0] = 1
     end_symbol = np.zeros([ntm.cell.input_dim], dtype=np.float32)
@@ -54,7 +55,8 @@ def copy(ntm, seq_length, sess, print_=True):
     else:
         return seq, outputs, read_ws, write_ws, loss
 
-def copy_train(config, sess):
+
+def train(ntm, config, sess):
     if not os.path.isdir(config.checkpoint_dir):
         raise Exception(" [!] Directory %s not found" % config.checkpoint_dir)
 
@@ -63,13 +65,6 @@ def copy_train(config, sess):
     start_symbol[0] = 1
     end_symbol = np.zeros([config.input_dim], dtype=np.float32)
     end_symbol[1] = 1
-
-    cell = NTMCell(input_dim=config.input_dim,
-                   output_dim=config.output_dim,
-                   controller_layer_size=config.controller_layer_size,
-                   write_head_size=config.write_head_size,
-                   read_head_size=config.read_head_size)
-    ntm = NTM(cell, sess, config.min_length, config.max_length)
 
     print(" [*] Initialize all variables")
     tf.initialize_all_variables().run()
@@ -101,7 +96,7 @@ def copy_train(config, sess):
                 % (idx, seq_length, cost, time.time() - start_time))
 
     print("Training Copy task finished")
-    return cell, ntm
+
 
 def generate_copy_sequence(length, bits):
     seq = np.zeros([length, bits + 2], dtype=np.float32)
