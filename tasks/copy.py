@@ -4,9 +4,7 @@ import numpy as np
 import tensorflow as tf
 from random import randint
 
-from ntm import NTM
 from utils import pprint
-from ntm_cell import NTMCell
 
 print_interval = 5
 
@@ -19,9 +17,9 @@ def run(ntm, seq_length, sess, print_=True):
 
     seq = generate_copy_sequence(seq_length, ntm.cell.input_dim - 2)
 
-    feed_dict = {input_:vec for vec, input_ in zip(seq, ntm.inputs)}
+    feed_dict = {input_: vec for vec, input_ in zip(seq, ntm.inputs)}
     feed_dict.update(
-        {true_output:vec for vec, true_output in zip(seq, ntm.true_outputs)}
+        {true_output: vec for vec, true_output in zip(seq, ntm.true_outputs)}
     )
     feed_dict.update({
         ntm.start_symbol: start_symbol,
@@ -31,10 +29,11 @@ def run(ntm, seq_length, sess, print_=True):
     input_states = [state['write_w'][0] for state in ntm.input_states[seq_length]]
     output_states = [state['read_w'][0] for state in ntm.get_output_states(seq_length)]
 
-    result = sess.run(ntm.get_outputs(seq_length) + \
-                      input_states + output_states + \
-                      [ntm.get_loss(seq_length)],
-                      feed_dict=feed_dict)
+    result = sess.run(
+        ntm.get_outputs(seq_length) +
+        input_states + output_states +
+        [ntm.get_loss(seq_length)],
+        feed_dict=feed_dict)
 
     is_sz = len(input_states)
     os_sz = len(output_states)
@@ -75,9 +74,9 @@ def train(ntm, config, sess):
         seq_length = randint(config.min_length, config.max_length)
         seq = generate_copy_sequence(seq_length, config.input_dim - 2)
 
-        feed_dict = {input_:vec for vec, input_ in zip(seq, ntm.inputs)}
+        feed_dict = {input_: vec for vec, input_ in zip(seq, ntm.inputs)}
         feed_dict.update(
-            {true_output:vec for vec, true_output in zip(seq, ntm.true_outputs)}
+            {true_output: vec for vec, true_output in zip(seq, ntm.true_outputs)}
         )
         feed_dict.update({
             ntm.start_symbol: start_symbol,
@@ -92,7 +91,8 @@ def train(ntm, config, sess):
             ntm.save(config.checkpoint_dir, 'copy', step)
 
         if idx % print_interval == 0:
-            print("[%5d] %2d: %.2f (%.1fs)" \
+            print(
+                "[%5d] %2d: %.2f (%.1fs)"
                 % (idx, seq_length, cost, time.time() - start_time))
 
     print("Training Copy task finished")
