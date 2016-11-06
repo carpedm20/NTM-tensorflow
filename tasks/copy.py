@@ -69,6 +69,9 @@ def train(ntm, config, sess):
     tf.initialize_all_variables().run()
     print(" [*] Initialization finished")
 
+    if config.continue_train is not False:
+        ntm.load(config.checkpoint_dir, config.task, strict=config.continue_train is True)
+
     start_time = time.time()
     for idx in xrange(config.epoch):
         seq_length = randint(config.min_length, config.max_length)
@@ -88,14 +91,16 @@ def train(ntm, config, sess):
                                   ntm.global_step], feed_dict=feed_dict)
 
         if idx % 100 == 0:
-            ntm.save(config.checkpoint_dir, 'copy', step)
+            ntm.save(config.checkpoint_dir, config.task, step)
 
         if idx % print_interval == 0:
             print(
                 "[%5d] %2d: %.2f (%.1fs)"
                 % (idx, seq_length, cost, time.time() - start_time))
 
-    print("Training Copy task finished")
+    ntm.save(config.checkpoint_dir, config.task, step)
+
+    print("Training %s task finished" % config.task)
 
 
 def generate_copy_sequence(length, bits):
