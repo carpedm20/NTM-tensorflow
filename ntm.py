@@ -5,7 +5,6 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 from collections import defaultdict
-from tensorflow.python.ops import array_ops
 from tensorflow.python.ops.seq2seq import sequence_loss
 
 import ntm_cell
@@ -14,11 +13,12 @@ import os
 from ops import binary_cross_entropy_with_logits
 from utils import progress
 
+
 class NTM(object):
     def __init__(self, cell, sess,
                  min_length, max_length,
                  test_max_length=120,
-                 min_grad=-10, max_grad=+10, 
+                 min_grad=-10, max_grad=+10,
                  lr=1e-4, momentum=0.9, decay=0.95,
                  scope="NTM", forward_only=False):
         """Create a neural turing machine specified by NTMCell "cell".
@@ -75,7 +75,9 @@ class NTM(object):
         self.saver = None
         self.params = None
 
-        self.global_step = tf.Variable(0, trainable=False)
+        with tf.variable_scope(self.scope):
+            self.global_step = tf.Variable(0, trainable=False)
+
         self.opt = tf.train.RMSPropOptimizer(self.lr,
                                              decay=self.decay,
                                              momentum=self.momentum)
@@ -94,7 +96,7 @@ class NTM(object):
 
             tf.get_variable_scope().reuse_variables()
             for seq_length in xrange(1, self.max_length + 1):
-                progress(seq_length/float(self.max_length))
+                progress(seq_length / float(self.max_length))
 
                 input_ = tf.placeholder(tf.float32, [self.cell.input_dim],
                                         name='input_%s' % seq_length)
@@ -129,20 +131,20 @@ class NTM(object):
                 for seq_length in xrange(self.min_length, self.max_length + 1):
                     print(" [*] Building a loss model for seq_length %s" % seq_length)
 
-                    loss = sequence_loss(logits=self.outputs[seq_length],
-                                        targets=self.true_outputs[0:seq_length],
-                                        weights=[1] * seq_length,
-                                        average_across_timesteps=False,
-                                        average_across_batch=False,
-                                        softmax_loss_function=\
-                                            binary_cross_entropy_with_logits)
+                    loss = sequence_loss(
+                        logits=self.outputs[seq_length],
+                        targets=self.true_outputs[0:seq_length],
+                        weights=[1] * seq_length,
+                        average_across_timesteps=False,
+                        average_across_batch=False,
+                        softmax_loss_function=binary_cross_entropy_with_logits)
 
-                    self.losses[seq_length] = loss 
+                    self.losses[seq_length] = loss
 
                     if not self.params:
                         self.params = tf.trainable_variables()
 
-                    #grads, norm = tf.clip_by_global_norm(
+                    # grads, norm = tf.clip_by_global_norm(
                     #                  tf.gradients(loss, self.params), 5)
 
                     grads = []
@@ -156,10 +158,12 @@ class NTM(object):
 
                     self.grads[seq_length] = grads
                     self.optims[seq_length] = self.opt.apply_gradients(
-                                                  zip(grads, self.params),
-                                                  global_step=self.global_step)
+                        zip(grads, self.params),
+                        global_step=self.global_step)
 
-        self.saver = tf.train.Saver()
+        model_vars = \
+            [v for v in tf.all_variables() if v.name.startswith(self.scope)]
+        self.saver = tf.train.Saver(model_vars)
         print(" [*] Build a NTM model finished")
 
     def get_outputs(self, seq_length):
@@ -184,15 +188,15 @@ class NTM(object):
             self.get_outputs(seq_length)
 
         if not self.losses.has_key(seq_length):
-            loss = sequence_loss(logits=self.outputs[seq_length],
-                                targets=self.true_outputs[0:seq_length],
-                                weights=[1] * seq_length,
-                                average_across_timesteps=False,
-                                average_across_batch=False,
-                                softmax_loss_function=\
-                                    binary_cross_entropy_with_logits)
+            loss = sequence_loss(
+                logits=self.outputs[seq_length],
+                targets=self.true_outputs[0:seq_length],
+                weights=[1] * seq_length,
+                average_across_timesteps=False,
+                average_across_batch=False,
+                softmax_loss_function=binary_cross_entropy_with_logits)
 
-            self.losses[seq_length] = loss 
+            self.losses[seq_length] = loss
         return self.losses[seq_length]
 
     def get_output_states(self, seq_length):
@@ -227,23 +231,24 @@ class NTM(object):
             state_to_add = self.input_states
 
         if to:
-            for idx in xrange(from_, to+1):
+            for idx in xrange(from_, to + 1):
                 state_to_add[idx].append(state)
         else:
             state_to_add[from_].append(state)
 
     def save(self, checkpoint_dir, task_name, step):
         task_dir = os.path.join(checkpoint_dir, "%s_%s" % (task_name, self.max_length))
-        file_name = "NTM_%s.model" % task_name
+        file_name = "%s_%s.model" % (self.scope, task_name)
 
         if not os.path.exists(task_dir):
             os.makedirs(task_dir)
 
-        self.saver.save(self.sess,
-                       os.path.join(task_dir, file_name),
-                       global_step = step.astype(int))
+        self.saver.save(
+            self.sess,
+            os.path.join(task_dir, file_name),
+            global_step=step.astype(int))
 
-    def load(self, checkpoint_dir, task_name):
+    def load(self, checkpoint_dir, task_name, strict=True):
         print(" [*] Reading checkpoints...")
 
         task_dir = "%s_%s" % (task_name, self.max_length)
@@ -254,4 +259,7 @@ class NTM(object):
             ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
             self.saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
         else:
-            raise Exception(" [!] Testing, but %s not found" % checkpoint_dir)
+            if strict:
+                raise Exception(" [!] Testing, but %s not found" % checkpoint_dir)
+            else:
+                print(' [!] Training, but previous training data %s not found' % checkpoint_dir)
