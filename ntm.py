@@ -10,7 +10,6 @@ from tensorflow.python.ops.seq2seq import sequence_loss
 import ntm_cell
 
 import os
-from ops import binary_cross_entropy_with_logits
 from utils import progress
 
 
@@ -57,6 +56,7 @@ class NTM(object):
 
         self.inputs = []
         self.outputs = {}
+        self.output_logits = {}
         self.true_outputs = []
 
         self.prev_states = {}
@@ -89,7 +89,7 @@ class NTM(object):
         with tf.variable_scope(self.scope):
             # present start symbol
             if is_copy:
-                _, prev_state = self.cell(self.start_symbol, state=None)
+                _, _, prev_state = self.cell(self.start_symbol, state=None)
                 self.save_state(prev_state, 0, self.max_length)
 
             zeros = np.zeros(self.cell.input_dim, dtype=np.float32)
@@ -107,37 +107,39 @@ class NTM(object):
                 self.true_outputs.append(true_output)
 
                 # present inputs
-                _, prev_state = self.cell(input_, prev_state)
+                _, _, prev_state = self.cell(input_, prev_state)
                 self.save_state(prev_state, seq_length, self.max_length)
 
                 # present end symbol
                 if is_copy:
-                    _, state = self.cell(self.end_symbol, prev_state)
+                    _, _, state = self.cell(self.end_symbol, prev_state)
                     self.save_state(state, seq_length)
 
                 self.prev_states[seq_length] = state
 
                 if not forward_only:
                     # present targets
-                    outputs = []
+                    outputs, output_logits = [], []
                     for _ in xrange(seq_length):
-                        output, state = self.cell(zeros, state)
+                        output, output_logit, state = self.cell(zeros, state)
                         self.save_state(state, seq_length, is_output=True)
                         outputs.append(output)
+                        output_logits.append(output_logit)
 
                     self.outputs[seq_length] = outputs
+                    self.output_logits[seq_length] = output_logits
 
             if not forward_only:
                 for seq_length in xrange(self.min_length, self.max_length + 1):
                     print(" [*] Building a loss model for seq_length %s" % seq_length)
 
                     loss = sequence_loss(
-                        logits=self.outputs[seq_length],
+                        logits=self.output_logits[seq_length],
                         targets=self.true_outputs[0:seq_length],
                         weights=[1] * seq_length,
                         average_across_timesteps=False,
                         average_across_batch=False,
-                        softmax_loss_function=binary_cross_entropy_with_logits)
+                        softmax_loss_function=tf.nn.sigmoid_cross_entropy_with_logits)
 
                     self.losses[seq_length] = loss
 
@@ -174,13 +176,15 @@ class NTM(object):
                 zeros = np.zeros(self.cell.input_dim, dtype=np.float32)
                 state = self.prev_states[seq_length]
 
-                outputs = []
+                outputs, output_logit = [], []
                 for _ in xrange(seq_length):
-                    output, state = self.cell(zeros, state)
+                    output, output_logit, state = self.cell(zeros, state)
                     self.save_state(state, seq_length, is_output=True)
                     outputs.append(output)
+                    output_logits.append(output_logit)
 
                 self.outputs[seq_length] = outputs
+                self.output_logits[seq_length] = output_logits
         return self.outputs[seq_length]
 
     def get_loss(self, seq_length):
@@ -189,12 +193,12 @@ class NTM(object):
 
         if not self.losses.has_key(seq_length):
             loss = sequence_loss(
-                logits=self.outputs[seq_length],
+                logits=self.output_logits[seq_length],
                 targets=self.true_outputs[0:seq_length],
                 weights=[1] * seq_length,
                 average_across_timesteps=False,
                 average_across_batch=False,
-                softmax_loss_function=binary_cross_entropy_with_logits)
+                softmax_loss_function=tf.nn.sigmoid_cross_entropy_with_logits)
 
             self.losses[seq_length] = loss
         return self.losses[seq_length]
@@ -206,14 +210,16 @@ class NTM(object):
             with tf.variable_scope(self.scope):
                 tf.get_variable_scope().reuse_variables()
 
-                outputs = []
+                outputs, output_logits = [], []
                 state = self.prev_states[seq_length]
 
                 for _ in xrange(seq_length):
-                    output, state = self.cell(zeros, state)
+                    output, output_logit, state = self.cell(zeros, state)
                     self.save_state(state, seq_length, is_output=True)
                     outputs.append(output)
+                    output_logits.append(output_logit)
                 self.outputs[seq_length] = outputs
+                self.output_logits[seq_length] = output_logits
         return self.output_states[seq_length]
 
     @property
