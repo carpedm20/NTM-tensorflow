@@ -202,24 +202,6 @@ def outer_product(*inputs):
 
     return output
 
-def binary_cross_entropy_with_logits(logits, targets, name=None):
-    """Computes binary cross entropy given `logits`.
-
-    For brevity, let `x = logits`, `z = targets`.  The logistic loss is
-
-        loss(x, z) = - sum_i (x[i] * log(z[i]) + (1 - x[i]) * log(1 - z[i]))
-
-    Args:
-        logits: A `Tensor` of type `float32` or `float64`.
-        targets: A `Tensor` of the same type and shape as `logits`.
-    """
-    eps = 1e-12
-    with ops.name_scope(name, "bce_loss", [logits, targets]) as name:
-        logits = ops.convert_to_tensor(logits, name="logits")
-        targets = ops.convert_to_tensor(targets, name="targets")
-        return -math_ops.reduce_mean(logits * math_ops.log(targets + eps) +
-                                     (1 - logits) * math_ops.log(1 - targets + eps))
-
 def scalar_mul(x, beta, name=None):
     return x * beta
 

@@ -83,7 +83,7 @@ class NTMCell(object):
                                                                     last_output)
 
         # get a new output
-        new_output = self.new_output(last_output)
+        new_output, new_output_logit = self.new_output(last_output)
 
         state = {
             'M': M,
@@ -97,13 +97,14 @@ class NTMCell(object):
         self.depth += 1
         self.states.append(state)
 
-        return new_output, state
+        return new_output, new_output_logit, state
 
     def new_output(self, output):
         """Logistic sigmoid output layers."""
 
         with tf.variable_scope('output'):
-            return tf.sigmoid(Linear(output, self.output_dim, name='output'))
+            logit = Linear(output, self.output_dim, name='output')
+            return tf.sigmoid(logit), logit
 
     def build_controller(self, input_,
                          read_list_prev, output_list_prev, hidden_list_prev):

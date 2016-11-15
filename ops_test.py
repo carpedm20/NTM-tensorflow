@@ -50,21 +50,5 @@ class CircularConvolutionTest(test_util.TensorFlowTestCase):
                 loss = circular_convolution(v, k).eval()
                 self.assertAllEqual(loss, [7,1,2,3,4,5,6])
 
-class BinaryCrossEntropyTest(test_util.TensorFlowTestCase):
-
-    def testBinaryCrossEntropy(self):
-        """Test code for torch:
-
-            th> optim = nn.BCECriterion()
-            th> print(optim:forward(torch.Tensor{0,1,0,1,0},torch.Tensor{0,1,1,1,1}))
-            11.052408446371
-        """
-        logits = np.array([0,1,0,1,0], dtype=np.float32)
-        targets = np.array([0,1,1,1,1], dtype=np.float32)
-        for use_gpu in [True, False]:
-            with self.test_session(use_gpu=use_gpu):
-                loss = binary_cross_entropy_with_logits(logits, targets).eval()
-                self.assertAllClose(loss, 11.052408446371)
-
 if __name__ == "__main__":
     googletest.main()
