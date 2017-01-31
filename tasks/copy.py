@@ -66,7 +66,7 @@ def train(ntm, config, sess):
     end_symbol[1] = 1
 
     print(" [*] Initialize all variables")
-    tf.initialize_all_variables().run()
+    tf.global_variables_initializer().run()
     print(" [*] Initialization finished")
 
     if config.continue_train is not False:

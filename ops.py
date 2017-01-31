@@ -5,7 +5,6 @@ import tensorflow as tf
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import init_ops
 from tensorflow.python.framework import ops
-from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import variable_scope as vs
 
 from utils import *
@@ -52,9 +51,9 @@ def linear(args, output_size, bias, bias_start=0.0, scope=None):
     with vs.variable_scope(scope or "Linear"):
         matrix = vs.get_variable("Matrix", [total_arg_size, output_size])
         if len(args) == 1:
-            res = math_ops.matmul(args[0], matrix)
+            res = tf.matmul(args[0], matrix)
         else:
-            res = math_ops.matmul(array_ops.concat(1, args), matrix)
+            res = tf.matmul(tf.concat_v2(args, 1), matrix)
         if not bias:
             return res
         bias_term = vs.get_variable(
@@ -104,7 +103,7 @@ def Linear(input_, output_size, stddev=0.5,
                     return tf.identity(tensor)
                 return _initializer
 
-            range_ = tf.reverse(tf.range(1, output_size+1, 1), [True])
+            range_ = tf.range(output_size, 0, -1)
             b = tf.get_variable(b_name, [output_size], tf.float32,
                                 identity_initializer(tf.cast(range_, tf.float32)))
         else:
@@ -187,7 +186,7 @@ def outer_product(*inputs):
             inputs[idx] = tf.reshape(input_, [-1, 1] if idx % 2 == 0 else [1, -1])
 
     if order == 2:
-        output = tf.mul(inputs[0], inputs[1])
+        output = tf.multiply(inputs[0], inputs[1])
     elif order == 3:
         size = []
         idx = 1
@@ -196,7 +195,7 @@ def outer_product(*inputs):
         output = tf.zeros(size)
 
         u, v, w = inputs[0], inputs[1], inputs[2]
-        uv = tf.mul(inputs[0], inputs[1])
+        uv = tf.multiply(inputs[0], inputs[1])
         for i in xrange(self.size[-1]):
             output = tf.scatter_add(output, [0,0,i], uv)
 

@@ -7,14 +7,15 @@ Tensorflow implementation of [Neural Turing Machine](http://arxiv.org/abs/1410.5
 
 The referenced torch code can be found [here](https://github.com/kaishengtai/torch-ntm).
 
-**Known issue: Loss sometimes goes to nan even with the gradient clipping ([#2](https://github.com/carpedm20/NTM-tensorflow/issues/2))**
+** 1. Loss sometimes goes to nan even with the gradient clipping ([#2](https://github.com/carpedm20/NTM-tensorflow/issues/2)).**
+** 2. The code is very poorly design to support NTM inputs with variable lengths. Just use this code as a reference.**
 
 
 Prerequisites
 -------------
 
 - Python 2.7 or Python 3.3+
-- [Tensorflow](https://www.tensorflow.org/)
+- [Tensorflow 0.12.1](https://www.tensorflow.org/)
 - NumPy
 
 

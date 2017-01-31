@@ -5,13 +5,15 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 from collections import defaultdict
-from tensorflow.python.ops.seq2seq import sequence_loss
+from tensorflow.contrib.legacy_seq2seq import sequence_loss
 
 import ntm_cell
 
 import os
 from utils import progress
 
+def softmax_loss_function(labels, inputs):
+  return tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=inputs)
 
 class NTM(object):
     def __init__(self, cell, sess,
@@ -49,9 +51,9 @@ class NTM(object):
         self.max_grad = max_grad
         self.min_length = min_length
         self.max_length = max_length
+        self._max_length = max_length
 
         if forward_only:
-            self._max_length = max_length
             self.max_length = test_max_length
 
         self.inputs = []
@@ -78,9 +80,6 @@ class NTM(object):
         with tf.variable_scope(self.scope):
             self.global_step = tf.Variable(0, trainable=False)
 
-        self.opt = tf.train.RMSPropOptimizer(self.lr,
-                                             decay=self.decay,
-                                             momentum=self.momentum)
         self.build_model(forward_only)
 
     def build_model(self, forward_only, is_copy=True):
@@ -139,7 +138,7 @@ class NTM(object):
                         weights=[1] * seq_length,
                         average_across_timesteps=False,
                         average_across_batch=False,
-                        softmax_loss_function=tf.nn.sigmoid_cross_entropy_with_logits)
+                        softmax_loss_function=softmax_loss_function)
 
                     self.losses[seq_length] = loss
 
@@ -159,12 +158,18 @@ class NTM(object):
                             grads.append(grad)
 
                     self.grads[seq_length] = grads
-                    self.optims[seq_length] = self.opt.apply_gradients(
-                        zip(grads, self.params),
-                        global_step=self.global_step)
+                    opt = tf.train.RMSPropOptimizer(self.lr,
+                                                    decay=self.decay,
+                                                    momentum=self.momentum)
+
+                    reuse = seq_length != 1
+                    with tf.variable_scope(tf.get_variable_scope(), reuse=reuse):
+                        self.optims[seq_length] = opt.apply_gradients(
+                            zip(grads, self.params),
+                            global_step=self.global_step)
 
         model_vars = \
-            [v for v in tf.all_variables() if v.name.startswith(self.scope)]
+            [v for v in tf.global_variables() if v.name.startswith(self.scope)]
         self.saver = tf.train.Saver(model_vars)
         print(" [*] Build a NTM model finished")
 
@@ -176,7 +181,7 @@ class NTM(object):
                 zeros = np.zeros(self.cell.input_dim, dtype=np.float32)
                 state = self.prev_states[seq_length]
 
-                outputs, output_logit = [], []
+                outputs, output_logits = [], []
                 for _ in xrange(seq_length):
                     output, output_logit, state = self.cell(zeros, state)
                     self.save_state(state, seq_length, is_output=True)
@@ -198,7 +203,7 @@ class NTM(object):
                 weights=[1] * seq_length,
                 average_across_timesteps=False,
                 average_across_batch=False,
-                softmax_loss_function=tf.nn.sigmoid_cross_entropy_with_logits)
+                softmax_loss_function=softmax_loss_function)
 
             self.losses[seq_length] = loss
         return self.losses[seq_length]
