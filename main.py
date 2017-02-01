@@ -59,13 +59,13 @@ def main(_):
         ntm.load(FLAGS.checkpoint_dir, FLAGS.task)
 
         if FLAGS.task == 'copy':
-            task.run(ntm, FLAGS.test_max_length * 1 / 3, sess)
+            task.run(ntm, int(FLAGS.test_max_length * 1 / 3), sess)
             print
-            task.run(ntm, FLAGS.test_max_length * 2 / 3, sess)
+            task.run(ntm, int(FLAGS.test_max_length * 2 / 3), sess)
             print
-            task.run(ntm, FLAGS.test_max_length * 3 / 3, sess)
+            task.run(ntm, int(FLAGS.test_max_length * 3 / 3), sess)
         else:
-            task.run(ntm, FLAGS.test_max_length, sess)
+            task.run(ntm, int(FLAGS.test_max_length), sess)
 
 
 if __name__ == '__main__':
