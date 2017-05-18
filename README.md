@@ -15,7 +15,7 @@ Prerequisites
 -------------
 
 - Python 2.7 or Python 3.3+
-- [Tensorflow 0.12.1](https://www.tensorflow.org/)
+- [Tensorflow 1.1.0](https://www.tensorflow.org/)
 - NumPy
 
 
