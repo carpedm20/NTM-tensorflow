@@ -53,7 +53,7 @@ def linear(args, output_size, bias, bias_start=0.0, scope=None):
         if len(args) == 1:
             res = tf.matmul(args[0], matrix)
         else:
-            res = tf.matmul(tf.concat_v2(args, 1), matrix)
+            res = tf.matmul(tf.concat(args, 1), matrix)
         if not bias:
             return res
         bias_term = vs.get_variable(
